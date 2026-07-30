@@ -21,6 +21,12 @@
 #include "gpu/ipc/service/image_transport_surface.h"
 #include "ui/gl/init/gl_factory.h"
 
+#if BUILDFLAG(IS_OZONE)
+#include "ui/ozone/public/ozone_presenter.h"
+#include "ui/ozone/public/ozone_platform.h"
+#include "ui/ozone/public/surface_factory_ozone.h"
+#endif
+
 namespace viz {
 
 SkiaOutputSurfaceDependencyImpl::SkiaOutputSurfaceDependencyImpl(
@@ -98,6 +104,16 @@ bool SkiaOutputSurfaceDependencyImpl::IsOffscreen() {
 gpu::SurfaceHandle SkiaOutputSurfaceDependencyImpl::GetSurfaceHandle() {
   return surface_handle_;
 }
+
+#if BUILDFLAG(IS_OZONE)
+std::unique_ptr<ui::OzonePresenter>
+SkiaOutputSurfaceDependencyImpl::CreateOzonePresenter() {
+  CHECK(!IsOffscreen());
+  return ui::OzonePlatform::GetInstance()
+      ->GetSurfaceFactoryOzone()
+      ->CreateOzonePresenter(surface_handle_);
+}
+#endif
 
 scoped_refptr<gl::Presenter>
 SkiaOutputSurfaceDependencyImpl::CreatePresenter() {

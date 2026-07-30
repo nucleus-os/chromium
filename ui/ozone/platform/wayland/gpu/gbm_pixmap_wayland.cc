@@ -10,6 +10,7 @@
 
 #include <memory>
 
+#include "base/command_line.h"
 #include "base/containers/flat_set.h"
 #include "base/files/platform_file.h"
 #include "base/logging.h"
@@ -23,8 +24,8 @@
 #include "ui/gfx/linux/gbm_device.h"
 #include "ui/gfx/linux/gbm_util.h"
 #include "ui/gfx/native_pixmap_handle.h"
-#include "ui/ozone/platform/wayland/gpu/gbm_surfaceless_wayland.h"
 #include "ui/ozone/platform/wayland/gpu/wayland_buffer_manager_gpu.h"
+#include "ui/ozone/platform/wayland/gpu/wayland_buffer_queue_presenter.h"
 #include "ui/ozone/public/native_pixmap_usage_utils.h"
 #include "ui/ozone/public/ozone_platform.h"
 
@@ -59,10 +60,20 @@ bool GbmPixmapWayland::InitializeBuffer(
   const uint32_t fourcc_format = GetFourCCFormatFromSharedImageFormat(format);
   const uint32_t gbm_flags = ui::NativePixmapUsageToGbmFlags(usage);
   auto modifiers = buffer_manager_->GetModifiersForFormat(format);
+  const bool require_explicit_modifier =
+      usage.Has(NativePixmapUsage::kScanout) &&
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          "require-skia-graphite-dawn-vulkan");
 
   // Create buffer object without format modifiers unless they are explicitly
   // advertised by the Wayland compositor, via linux-dmabuf protocol.
   if (modifiers.empty()) {
+    if (require_explicit_modifier) {
+      LOG(ERROR) << "Graphite/Dawn/Vulkan has no explicit shared DRM modifier "
+                    "for format="
+                 << format.ToString();
+      return false;
+    }
     gbm_bo_ = gbm_device->CreateBuffer(fourcc_format, size, gbm_flags);
   } else {
     // When buffer |usage| implies on GBM_BO_USE_LINEAR, pass in
@@ -86,7 +97,8 @@ bool GbmPixmapWayland::InitializeBuffer(
     // rendering, while wlroots would announce MOD_LINEAR and MOD_INVALID).
     // In such cases gbm_bo allocation may fail, where we should fallback to
     // creation without modifiers, and leave the choices to driver.
-    if (!gbm_bo_ && buffer_manager_->AllowsImplicitModifierForFormat(format)) {
+    if (!gbm_bo_ && !require_explicit_modifier &&
+        buffer_manager_->AllowsImplicitModifierForFormat(format)) {
       gbm_bo_ = gbm_device->CreateBuffer(fourcc_format, size, gbm_flags);
     }
   }
@@ -201,17 +213,16 @@ bool GbmPixmapWayland::ScheduleOverlayPlane(
   auto* surface = buffer_manager_->GetSurface(widget);
   // This must never be hit.
   DCHECK(surface);
-  GbmSurfacelessWayland* surfaceless =
-      static_cast<GbmSurfacelessWayland*>(surface);
-  DCHECK(surfaceless);
+  auto* presenter = static_cast<WaylandBufferQueuePresenter*>(surface);
+  DCHECK(presenter);
 
   DCHECK(acquire_fences.empty() || acquire_fences.size() == 1u);
-  surfaceless->QueueWaylandOverlayConfig(
+  presenter->QueueWaylandOverlayConfig(
       {overlay_plane_data,
        acquire_fences.empty()
            ? nullptr
            : std::make_unique<gfx::GpuFence>(std::move(acquire_fences[0])),
-       buffer_id_, surfaceless->surface_scale_factor()});
+       buffer_id_, presenter->surface_scale_factor()});
   return true;
 }
 

@@ -38,6 +38,11 @@ class WaylandSurfaceGpu {
   virtual void OnPresentation(uint32_t frame_id,
                               const gfx::PresentationFeedback& feedback) = 0;
 
+  // Signals that the browser-process Wayland host disappeared. Presenters
+  // with queued callbacks must terminate them; legacy surfaces may wait for
+  // their normal GPU-process recreation.
+  virtual void OnBufferManagerDisconnected() {}
+
   uint32_t next_frame_id() { return ++frame_id_; }
 
  private:

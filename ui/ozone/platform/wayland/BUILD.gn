@@ -342,6 +342,8 @@ source_set("wayland") {
       "gpu/gbm_pixmap_wayland.h",
       "gpu/gbm_surfaceless_wayland.cc",
       "gpu/gbm_surfaceless_wayland.h",
+      "gpu/wayland_buffer_queue_presenter.cc",
+      "gpu/wayland_buffer_queue_presenter.h",
     ]
 
     deps += [

@@ -45,6 +45,9 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceDependencyImpl
   const gpu::GpuFeatureInfo& GetGpuFeatureInfo() override;
   bool IsOffscreen() override;
   gpu::SurfaceHandle GetSurfaceHandle() override;
+#if BUILDFLAG(IS_OZONE)
+  std::unique_ptr<ui::OzonePresenter> CreateOzonePresenter() override;
+#endif
   scoped_refptr<gl::GLSurface> CreateGLSurface(
       gl::GLSurfaceFormat format) override;
   scoped_refptr<gl::Presenter> CreatePresenter() override;

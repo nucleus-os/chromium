@@ -370,6 +370,10 @@ bool TestOverlayImageRepresentation::BeginReadAccess(
   return true;
 }
 
+void TestOverlayImageRepresentation::CommitReadAccess() {
+  static_cast<TestImageBacking*>(backing())->OnOverlayAccessCommitted();
+}
+
 void TestOverlayImageRepresentation::EndReadAccess(
     gfx::GpuFenceHandle release_fence) {}
 

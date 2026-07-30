@@ -126,6 +126,7 @@ class WaylandSurfaceExplicitSyncTest : public WaylandTestSimple {
                                     /*supports_dma_buf=*/false,
                                     /*supports_viewporter=*/true,
                                     /*supports_acquire_fence=*/false,
+                                    /*supports_explicit_sync=*/false,
                                     /*supports_overlays=*/true,
                                     /*supports_single_pixel_buffer=*/true);
   }

@@ -82,8 +82,8 @@ EGLConfig GLSurfaceWayland::GetConfig() {
 // state setter calls in the functions below, where a cached and ceiled scale
 // factor is used. Ideally surface information should be set using the standard
 // WaylandFrameManager::ApplySurfaceConfigure flow, i.e: whose entry point is
-// WaylandBufferManager::CommitOverlays. Which is done in GbmSurfacelessWayland,
-// for example.
+// WaylandBufferManager::CommitOverlays. The surfaceless presenter path owns
+// that transaction, for example.
 
 gfx::SwapResult GLSurfaceWayland::SwapBuffers(PresentationCallback callback,
                                               gfx::FrameData data) {

@@ -13,8 +13,8 @@ import("//gpu/vulkan/features.gni")
 import("//media/gpu/args.gni")
 import("//skia/features.gni")
 import("//testing/libfuzzer/fuzzer_test.gni")
+import("//testing/test.gni")
 import("//third_party/jni_zero/jni_zero.gni")
-
 config("viz_service_implementation") {
 }
 
@@ -490,6 +490,8 @@ viz_component("service") {
       "display/overlay_processor_delegated_support.h",
       "display/overlay_processor_ozone.cc",
       "display/overlay_processor_ozone.h",
+      "display_embedder/output_presenter_ozone.cc",
+      "display_embedder/output_presenter_ozone.h",
       "display_embedder/software_output_device_ozone.cc",
       "display_embedder/software_output_device_ozone.h",
     ]
@@ -753,6 +755,7 @@ viz_source_set("unit_tests") {
       "display/overlay_combination_cache_unittest.cc",
       "display/overlay_processor_ozone_unittest.cc",
       "display/overlay_unittest.cc",
+      "display_embedder/output_presenter_ozone_unittest.cc",
       "display_embedder/software_output_device_ozone_unittest.cc",
     ]
     deps += [
@@ -810,6 +813,25 @@ viz_source_set("unit_tests") {
     deps += [
       "//gpu/vulkan:test_support",
       "//gpu/vulkan/init",
+    ]
+  }
+}
+
+if (use_ozone) {
+  test("output_presenter_ozone_unittests") {
+    sources = [ "display_embedder/output_presenter_ozone_unittest.cc" ]
+    deps = [
+      ":service",
+      "//base",
+      "//base/test:test_support",
+      "//components/viz/common",
+      "//gpu:test_support",
+      "//mojo/core/test:run_all_unittests",
+      "//skia",
+      "//testing/gtest",
+      "//ui/gfx",
+      "//ui/gfx:test_support",
+      "//ui/ozone",
     ]
   }
 }

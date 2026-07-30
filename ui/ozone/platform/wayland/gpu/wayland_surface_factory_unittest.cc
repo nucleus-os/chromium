@@ -31,6 +31,7 @@
 #include "ui/gl/gl_utils.h"
 #include "ui/ozone/platform/wayland/gpu/gbm_surfaceless_wayland.h"
 #include "ui/ozone/platform/wayland/gpu/wayland_buffer_manager_gpu.h"
+#include "ui/ozone/platform/wayland/gpu/wayland_buffer_queue_presenter.h"
 #include "ui/ozone/platform/wayland/host/wayland_buffer_manager_host.h"
 #include "ui/ozone/platform/wayland/host/wayland_subsurface.h"
 #include "ui/ozone/platform/wayland/host/wayland_window.h"
@@ -39,6 +40,7 @@
 #include "ui/ozone/platform/wayland/test/test_wayland_server_thread.h"
 #include "ui/ozone/platform/wayland/test/test_zwp_linux_buffer_params.h"
 #include "ui/ozone/platform/wayland/test/wayland_test.h"
+#include "ui/ozone/public/ozone_presenter.h"
 #include "ui/ozone/public/surface_ozone_canvas.h"
 #include "ui/ozone/test/mock_platform_window_delegate.h"
 
@@ -204,6 +206,7 @@ class WaylandSurfaceFactoryTest : public WaylandTest {
                                     /*supports_dma_buf=*/false,
                                     /*supports_viewporter=*/true,
                                     /*supports_acquire_fence=*/false,
+                                    /*supports_explicit_sync=*/false,
                                     /*supports_overlays=*/true,
                                     /*supports_single_pixel_buffer=*/true);
 
@@ -246,6 +249,248 @@ class WaylandSurfaceFactoryTest : public WaylandTest {
 
   uint32_t surface_id_ = 0;
 };
+
+TEST_P(WaylandSurfaceFactoryTest,
+       OzonePresenterFailsIncompleteFrameAtomically) {
+  buffer_manager_gpu_->use_fake_gbm_device_for_test_ = true;
+  buffer_manager_gpu_->gbm_device_ = std::make_unique<MockGbmDevice>();
+  buffer_manager_gpu_->supports_dmabuf_ = true;
+  buffer_manager_gpu_->supports_acquire_fence_ = true;
+  buffer_manager_gpu_->supports_explicit_sync_ = true;
+
+  auto presenter = surface_factory()->CreateOzonePresenter(widget_);
+  ASSERT_TRUE(presenter);
+
+  gfx::OverlayPlaneData plane;
+  EXPECT_FALSE(presenter->ScheduleOverlayPlane(
+      /*image=*/nullptr, /*acquire_fence=*/nullptr, plane));
+
+  int completion_count = 0;
+  int presentation_count = 0;
+  presenter->Present(
+      base::BindOnce(
+          [](int* count, gfx::SwapCompletionResult result) {
+            ++*count;
+            EXPECT_EQ(result.swap_result, gfx::SwapResult::SWAP_FAILED);
+          },
+          &completion_count),
+      base::BindOnce(
+          [](int* count, const gfx::PresentationFeedback& feedback) {
+            ++*count;
+            EXPECT_TRUE(feedback.failed());
+          },
+          &presentation_count),
+      gfx::FrameData());
+
+  EXPECT_EQ(completion_count, 1);
+  EXPECT_EQ(presentation_count, 1);
+}
+
+TEST_P(WaylandSurfaceFactoryTest, OzonePresenterTeardownResolvesCallbacks) {
+  buffer_manager_gpu_->use_fake_gbm_device_for_test_ = true;
+  buffer_manager_gpu_->gbm_device_ = std::make_unique<MockGbmDevice>();
+  buffer_manager_gpu_->supports_dmabuf_ = true;
+  buffer_manager_gpu_->supports_acquire_fence_ = true;
+  buffer_manager_gpu_->supports_explicit_sync_ = true;
+
+  auto presenter = surface_factory()->CreateOzonePresenter(widget_);
+  ASSERT_TRUE(presenter);
+
+  int completion_count = 0;
+  int presentation_count = 0;
+  presenter->Present(
+      base::BindOnce(
+          [](int* count, gfx::SwapCompletionResult result) {
+            ++*count;
+            EXPECT_EQ(result.swap_result, gfx::SwapResult::SWAP_FAILED);
+          },
+          &completion_count),
+      base::BindOnce(
+          [](int* count, const gfx::PresentationFeedback& feedback) {
+            ++*count;
+            EXPECT_TRUE(feedback.failed());
+          },
+          &presentation_count),
+      gfx::FrameData());
+
+  presenter.reset();
+  EXPECT_EQ(completion_count, 1);
+  EXPECT_EQ(presentation_count, 1);
+
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(completion_count, 1);
+  EXPECT_EQ(presentation_count, 1);
+}
+
+TEST_P(WaylandSurfaceFactoryTest, OzonePresenterCallbacksMayDestroyPresenter) {
+  buffer_manager_gpu_->use_fake_gbm_device_for_test_ = true;
+  buffer_manager_gpu_->gbm_device_ = std::make_unique<MockGbmDevice>();
+  buffer_manager_gpu_->supports_dmabuf_ = true;
+  buffer_manager_gpu_->supports_acquire_fence_ = true;
+  buffer_manager_gpu_->supports_explicit_sync_ = true;
+
+  auto presenter = surface_factory()->CreateOzonePresenter(widget_);
+  ASSERT_TRUE(presenter);
+
+  gfx::OverlayPlaneData plane;
+  EXPECT_FALSE(presenter->ScheduleOverlayPlane(
+      /*image=*/nullptr, /*acquire_fence=*/nullptr, plane));
+
+  int completion_count = 0;
+  int presentation_count = 0;
+  presenter->Present(
+      base::BindOnce(
+          [](std::unique_ptr<OzonePresenter>* presenter, int* count,
+             gfx::SwapCompletionResult result) {
+            ++*count;
+            EXPECT_EQ(result.swap_result, gfx::SwapResult::SWAP_FAILED);
+            presenter->reset();
+          },
+          &presenter, &completion_count),
+      base::BindOnce(
+          [](int* count, const gfx::PresentationFeedback& feedback) {
+            ++*count;
+            EXPECT_TRUE(feedback.failed());
+          },
+          &presentation_count),
+      gfx::FrameData());
+
+  EXPECT_FALSE(presenter);
+  EXPECT_EQ(completion_count, 1);
+  EXPECT_EQ(presentation_count, 1);
+
+  presenter = surface_factory()->CreateOzonePresenter(widget_);
+  ASSERT_TRUE(presenter);
+  auto* wayland_presenter =
+      static_cast<WaylandBufferQueuePresenter*>(presenter.get());
+
+  completion_count = 0;
+  presentation_count = 0;
+  presenter->Present(
+      base::BindOnce(
+          [](std::unique_ptr<OzonePresenter>* presenter, int* count,
+             gfx::SwapCompletionResult result) {
+            ++*count;
+            EXPECT_EQ(result.swap_result, gfx::SwapResult::SWAP_ACK);
+            presenter->reset();
+          },
+          &presenter, &completion_count),
+      base::BindOnce(
+          [](int* count, const gfx::PresentationFeedback& feedback) {
+            ++*count;
+            EXPECT_TRUE(feedback.failed());
+          },
+          &presentation_count),
+      gfx::FrameData());
+
+  ASSERT_EQ(wayland_presenter->submitted_frames_.size(), 1u);
+  const uint32_t submitted_frame_id =
+      wayland_presenter->submitted_frames_.front()->frame_id;
+  wayland_presenter->OnSubmission(
+      submitted_frame_id, gfx::SwapResult::SWAP_ACK, gfx::GpuFenceHandle());
+
+  EXPECT_FALSE(presenter);
+  EXPECT_EQ(completion_count, 1);
+  EXPECT_EQ(presentation_count, 1);
+}
+
+TEST_P(WaylandSurfaceFactoryTest,
+       OzonePresenterRejectsStaleSurfaceResponse) {
+  buffer_manager_gpu_->use_fake_gbm_device_for_test_ = true;
+  buffer_manager_gpu_->gbm_device_ = std::make_unique<MockGbmDevice>();
+  buffer_manager_gpu_->supports_dmabuf_ = true;
+  buffer_manager_gpu_->supports_acquire_fence_ = true;
+  buffer_manager_gpu_->supports_explicit_sync_ = true;
+
+  auto first = surface_factory()->CreateOzonePresenter(widget_);
+  ASSERT_TRUE(first);
+  auto* first_wayland =
+      static_cast<WaylandBufferQueuePresenter*>(first.get());
+
+  int first_completion_count = 0;
+  first->Present(
+      base::BindOnce(
+          [](int* count, gfx::SwapCompletionResult) { ++*count; },
+          &first_completion_count),
+      base::DoNothing(), gfx::FrameData());
+  ASSERT_EQ(first_wayland->submitted_frames_.size(), 1u);
+  const uint32_t stale_frame_id =
+      first_wayland->submitted_frames_.front()->frame_id;
+  first.reset();
+  EXPECT_EQ(first_completion_count, 1);
+
+  auto replacement = surface_factory()->CreateOzonePresenter(widget_);
+  ASSERT_TRUE(replacement);
+  auto* replacement_wayland =
+      static_cast<WaylandBufferQueuePresenter*>(replacement.get());
+
+  int replacement_completion_count = 0;
+  replacement->Present(
+      base::BindOnce(
+          [](int* count, gfx::SwapCompletionResult) { ++*count; },
+          &replacement_completion_count),
+      base::DoNothing(), gfx::FrameData());
+  ASSERT_EQ(replacement_wayland->submitted_frames_.size(), 1u);
+  EXPECT_NE(replacement_wayland->submitted_frames_.front()->frame_id,
+            stale_frame_id);
+
+  replacement_wayland->OnSubmission(
+      stale_frame_id, gfx::SwapResult::SWAP_ACK, gfx::GpuFenceHandle());
+  EXPECT_EQ(replacement_completion_count, 0);
+
+  replacement.reset();
+  EXPECT_EQ(replacement_completion_count, 1);
+}
+
+TEST_P(WaylandSurfaceFactoryTest,
+       OzonePresenterRequiresLinuxDrmSyncobj) {
+  buffer_manager_gpu_->use_fake_gbm_device_for_test_ = true;
+  buffer_manager_gpu_->gbm_device_ = std::make_unique<MockGbmDevice>();
+  buffer_manager_gpu_->supports_dmabuf_ = true;
+  buffer_manager_gpu_->supports_acquire_fence_ = true;
+  buffer_manager_gpu_->supports_explicit_sync_ = false;
+
+  EXPECT_FALSE(surface_factory()->CreateOzonePresenter(widget_));
+}
+
+TEST_P(WaylandSurfaceFactoryTest,
+       OzonePresenterDisconnectResolvesCallbacks) {
+  buffer_manager_gpu_->use_fake_gbm_device_for_test_ = true;
+  buffer_manager_gpu_->gbm_device_ = std::make_unique<MockGbmDevice>();
+  buffer_manager_gpu_->supports_dmabuf_ = true;
+  buffer_manager_gpu_->supports_acquire_fence_ = true;
+  buffer_manager_gpu_->supports_explicit_sync_ = true;
+
+  auto presenter = surface_factory()->CreateOzonePresenter(widget_);
+  ASSERT_TRUE(presenter);
+  base::RunLoop().RunUntilIdle();
+
+  int completion_count = 0;
+  int presentation_count = 0;
+  presenter->Present(
+      base::BindOnce(
+          [](int* count, gfx::SwapCompletionResult result) {
+            ++*count;
+            EXPECT_EQ(result.swap_result, gfx::SwapResult::SWAP_FAILED);
+          },
+          &completion_count),
+      base::BindOnce(
+          [](int* count, const gfx::PresentationFeedback& feedback) {
+            ++*count;
+            EXPECT_TRUE(feedback.failed());
+          },
+          &presentation_count),
+      gfx::FrameData());
+
+  buffer_manager_gpu_->OnHostDisconnected();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(completion_count, 1);
+  EXPECT_EQ(presentation_count, 1);
+
+  presenter.reset();
+  EXPECT_EQ(completion_count, 1);
+  EXPECT_EQ(presentation_count, 1);
+}
 
 TEST_P(WaylandSurfaceFactoryTest,
        GbmSurfacelessWaylandCommitOverlaysCallbacksTest) {

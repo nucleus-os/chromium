@@ -66,6 +66,7 @@ class WaylandBufferManagerGpu : public ozone::mojom::WaylandBufferManagerGpu {
       bool supports_dma_buf,
       bool supports_viewporter,
       bool supports_acquire_fence,
+      bool supports_explicit_sync,
       bool supports_overlays,
       bool supports_single_pixel_buffer) override;
 
@@ -158,6 +159,7 @@ class WaylandBufferManagerGpu : public ozone::mojom::WaylandBufferManagerGpu {
   gl::EGLDisplayPlatform GetNativeDisplay();
 
   bool supports_acquire_fence() const { return supports_acquire_fence_; }
+  bool supports_explicit_sync() const { return supports_explicit_sync_; }
   bool supports_viewporter() const { return supports_viewporter_; }
   bool supports_overlays() const { return supports_overlays_; }
   bool supports_single_pixel_buffer() const {
@@ -181,6 +183,11 @@ class WaylandBufferManagerGpu : public ozone::mojom::WaylandBufferManagerGpu {
   // Allocates a unique buffer ID.
   uint32_t AllocateBufferID();
 
+  // Allocates a process-wide frame ID. Keeping the sequence on the manager
+  // prevents a delayed response for a destroyed surface from aliasing the
+  // first frame of a replacement surface for the same widget.
+  uint32_t AllocateFrameID();
+
   // Returns if a format is supported by current Wayland implementation.
   bool SupportsFormat(viz::SharedImageFormat format) const;
 
@@ -190,6 +197,18 @@ class WaylandBufferManagerGpu : public ozone::mojom::WaylandBufferManagerGpu {
                            GbmSurfacelessWaylandCommitOverlaysCallbacksTest);
   FRIEND_TEST_ALL_PREFIXES(WaylandSurfaceFactoryTest,
                            GbmSurfacelessWaylandGroupOnSubmissionCallbacksTest);
+  FRIEND_TEST_ALL_PREFIXES(WaylandSurfaceFactoryTest,
+                           OzonePresenterFailsIncompleteFrameAtomically);
+  FRIEND_TEST_ALL_PREFIXES(WaylandSurfaceFactoryTest,
+                           OzonePresenterTeardownResolvesCallbacks);
+  FRIEND_TEST_ALL_PREFIXES(WaylandSurfaceFactoryTest,
+                           OzonePresenterRejectsStaleSurfaceResponse);
+  FRIEND_TEST_ALL_PREFIXES(WaylandSurfaceFactoryTest,
+                           OzonePresenterRequiresLinuxDrmSyncobj);
+  FRIEND_TEST_ALL_PREFIXES(WaylandSurfaceFactoryTest,
+                           OzonePresenterDisconnectResolvesCallbacks);
+  FRIEND_TEST_ALL_PREFIXES(WaylandSurfaceFactoryTest,
+                           OzonePresenterCallbacksMayDestroyPresenter);
   FRIEND_TEST_ALL_PREFIXES(WaylandSurfaceFactoryCompositorV3,
                            SurfaceDamageTest);
   FRIEND_TEST_ALL_PREFIXES(WaylandBufferManagerTest,
@@ -216,6 +235,7 @@ class WaylandBufferManagerGpu : public ozone::mojom::WaylandBufferManagerGpu {
   void HandlePresentationOnOriginThread(
       gfx::AcceleratedWidget widget,
       const std::vector<wl::WaylandPresentationInfo>& presentation_infos);
+  void HandleDisconnectOnOriginThread(gfx::AcceleratedWidget widget);
 
   void OnHostDisconnected();
 
@@ -269,6 +289,9 @@ class WaylandBufferManagerGpu : public ozone::mojom::WaylandBufferManagerGpu {
 
   // Whether Wayland server allows buffer submission with acquire fence.
   bool supports_acquire_fence_ = false;
+
+  // Whether acquire and release fences use linux-drm-syncobj-v1.
+  bool supports_explicit_sync_ = false;
 
   // Whether Wayland server implements wp_viewporter extension to support
   // cropping and scaling buffers.
@@ -332,6 +355,9 @@ class WaylandBufferManagerGpu : public ozone::mojom::WaylandBufferManagerGpu {
 
   // Keeps track of the next unique buffer ID.
   uint32_t next_buffer_id_ = 0;
+
+  // Keeps track of the next unique frame ID across all registered surfaces.
+  uint32_t next_frame_id_ = 0;
 
   // The tasks that are blocked on a remote_host pipe becoming bound.
   std::vector<base::OnceClosure> pending_tasks_;

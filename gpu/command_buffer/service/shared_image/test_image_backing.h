@@ -51,6 +51,10 @@ class TestImageBacking : public SharedImageBacking {
   GLuint service_id() const { return textures_[0]->service_id(); }
   void set_can_access(bool can_access) { can_access_ = can_access; }
   bool can_access() const { return can_access_; }
+  int overlay_access_commit_count() const {
+    return overlay_access_commit_count_;
+  }
+  void OnOverlayAccessCommitted() { ++overlay_access_commit_count_; }
 
 #if BUILDFLAG(IS_APPLE)
   void set_in_use_by_window_server(bool in_use_by_window_server) {
@@ -102,6 +106,7 @@ class TestImageBacking : public SharedImageBacking {
 
   bool upload_from_memory_called_ = false;
   bool readback_to_memory_called_ = false;
+  int overlay_access_commit_count_ = 0;
   PurgeableCallback set_purgeable_callback_;
   PurgeableCallback set_not_purgeable_callback_;
 };
@@ -114,6 +119,7 @@ class TestOverlayImageRepresentation : public OverlayImageRepresentation {
       : OverlayImageRepresentation(manager, backing, tracker) {}
 
   bool BeginReadAccess(gfx::GpuFenceHandle& acquire_fence) override;
+  void CommitReadAccess() override;
   void EndReadAccess(gfx::GpuFenceHandle release_fence) override;
 
 #if BUILDFLAG(IS_ANDROID)

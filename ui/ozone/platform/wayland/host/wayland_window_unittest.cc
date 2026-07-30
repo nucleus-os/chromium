@@ -419,6 +419,7 @@ class WaylandWindowTest : public WaylandTest {
                                     /*supports_dma_buf=*/false,
                                     /*supports_viewporter=*/true,
                                     /*supports_acquire_fence=*/false,
+                                    /*supports_explicit_sync=*/false,
                                     /*supports_overlays=*/true,
                                     /*supports_single_pixel_buffer=*/true);
 
@@ -3759,6 +3760,7 @@ TEST_P(WaylandWindowTest, ReattachesBackgroundOnShow) {
                                   /*supports_dma_buf=*/false,
                                   /*supports_viewporter=*/true,
                                   /*supports_acquire_fence=*/false,
+                                  /*supports_explicit_sync=*/false,
                                   /*supports_overlays=*/true,
                                   /*supports_single_pixel_buffer=*/true);
 
@@ -4393,6 +4395,7 @@ TEST_P(WaylandWindowTest, NoDuplicateViewporterRequests) {
                                   /*supports_dma_buf=*/false,
                                   /*supports_viewporter=*/true,
                                   /*supports_acquire_fence=*/false,
+                                  /*supports_explicit_sync=*/false,
                                   /*supports_overlays=*/true,
                                   /*supports_single_pixel_buffer=*/true);
 

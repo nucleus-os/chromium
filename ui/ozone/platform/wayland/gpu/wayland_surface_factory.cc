@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "base/logging.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "components/viz/common/resources/shared_image_format_utils.h"
@@ -33,6 +34,7 @@
 #include "ui/gfx/linux/gbm_device.h"  // nogncheck
 #include "ui/ozone/platform/wayland/gpu/gbm_pixmap_wayland.h"
 #include "ui/ozone/platform/wayland/gpu/gbm_surfaceless_wayland.h"
+#include "ui/ozone/platform/wayland/gpu/wayland_buffer_queue_presenter.h"
 #include "ui/ozone/public/ozone_platform.h"
 #endif  // WAYLAND_GBM
 
@@ -214,6 +216,23 @@ WaylandSurfaceFactory::WaylandSurfaceFactory(
 
 WaylandSurfaceFactory::~WaylandSurfaceFactory() = default;
 
+std::unique_ptr<OzonePresenter> WaylandSurfaceFactory::CreateOzonePresenter(
+    gfx::AcceleratedWidget widget) {
+#if defined(WAYLAND_GBM)
+  if (!buffer_manager_->GetGbmDevice()) {
+    LOG(ERROR) << "Native Wayland presentation requires GBM DMA-BUF support.";
+    return nullptr;
+  }
+  if (!buffer_manager_->supports_explicit_sync()) {
+    LOG(ERROR) << "Native Wayland presentation requires "
+                  "linux-drm-syncobj-v1.";
+    return nullptr;
+  }
+  return std::make_unique<WaylandBufferQueuePresenter>(buffer_manager_, widget);
+#endif
+  return nullptr;
+}
+
 std::unique_ptr<SurfaceOzoneCanvas>
 WaylandSurfaceFactory::CreateCanvasForWidget(gfx::AcceleratedWidget widget) {
   return std::make_unique<WaylandCanvasSurface>(buffer_manager_, widget);
@@ -246,9 +265,8 @@ GLOzone* WaylandSurfaceFactory::GetGLOzone(
 std::unique_ptr<gpu::VulkanImplementation>
 WaylandSurfaceFactory::CreateVulkanImplementation(bool use_swiftshader,
                                                   bool allow_protected_memory) {
-  LOG_IF(ERROR, !use_swiftshader)
-      << "'--ozone-platform=wayland' is not compatible with Vulkan. "
-         "Consider switching to '--ozone-platform=x11' or disabling Vulkan";
+  // Window presentation is owned by Ozone's native-pixmap presenter. Vulkan
+  // remains available to ANGLE, Dawn, and other non-WSI clients.
   return std::make_unique<VulkanImplementationWayland>(use_swiftshader);
 }
 #endif
