@@ -16,6 +16,12 @@ interface ExternalBeginFrameController {
   IssueExternalBeginFrame(BeginFrameArgs args)
       => (BeginFrameAck ack);
 
+  // Resolve the currently pending frame without damage. This preserves the
+  // controller, display and output transport while guaranteeing that the
+  // IssueExternalBeginFrame callback terminates exactly once.
+  [EnableIfNot=is_ios]
+  AbortPendingFrame();
+
   // Issue a begin frame to the compositor. This is only used on iOS where begin
   // frames originate in the browser process due to sandbox restrictions and we
   // don't care about BeginFrameAcks for frame throttling unlike headless.

@@ -498,6 +498,11 @@ class VIZ_COMMON_EXPORT ExternalBeginFrameSource : public BeginFrameSource {
   // BeginFrameArgs is valid.
   virtual BeginFrameArgs GetMissedBeginFrameArgs(BeginFrameObserver* obs);
 
+  // Discards a BeginFrame that was deferred while the GPU was busy. Owners
+  // with an acknowledged request protocol call this when that request is
+  // explicitly aborted, so the retired frame cannot be delivered later.
+  void CancelPendingBeginFrame();
+
   BeginFrameArgs last_begin_frame_args_;
   base::flat_set<raw_ptr<BeginFrameObserver, CtnExperimental>> observers_;
   raw_ptr<ExternalBeginFrameSourceClient> client_;

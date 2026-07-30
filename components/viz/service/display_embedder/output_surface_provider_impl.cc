@@ -18,7 +18,10 @@
 #include "build/build_config.h"
 #include "build/chromecast_buildflags.h"
 #include "cc/base/switches.h"
+#include "cef/libcef/features/features.h"
+#if BUILDFLAG(ENABLE_CEF)
 #include "cef/libcef/browser/osr/software_output_device_proxy.h"
+#endif
 #include "components/viz/common/display/renderer_settings.h"
 #include "components/viz/common/features.h"
 #include "components/viz/common/frame_sinks/begin_frame_source.h"
@@ -154,6 +157,7 @@ OutputSurfaceProviderImpl::CreateSoftwareOutputDeviceForPlatform(
   if (headless_)
     return std::make_unique<SoftwareOutputDevice>();
 
+#if BUILDFLAG(ENABLE_CEF)
   if (use_proxy_output_device) {
     DCHECK(display_client);
     mojo::PendingRemote<mojom::LayeredWindowUpdater> layered_window_updater;
@@ -162,6 +166,9 @@ OutputSurfaceProviderImpl::CreateSoftwareOutputDeviceForPlatform(
     return std::make_unique<SoftwareOutputDeviceProxy>(
         std::move(layered_window_updater));
   }
+#else
+  CHECK(!use_proxy_output_device);
+#endif
 
 #if BUILDFLAG(IS_WIN)
   HWND child_hwnd;

@@ -2067,11 +2067,13 @@ void DevToolsWindow::CreateDevToolsBrowser() {
     return;
   }
 
+#if BUILDFLAG(ENABLE_CEF)
   auto* inspected_web_contents = GetInspectedWebContents();
   BrowserWindowInterface* opener = nullptr;
   if (inspected_web_contents) {
     opener = GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(inspected_web_contents);
   }
+#endif
   auto devtools_contents = OwnedMainWebContents::TakeWebContents(
       std::move(owned_main_web_contents_));
 
@@ -2084,7 +2086,9 @@ void DevToolsWindow::CreateDevToolsBrowser() {
 
   if (!browser_) {
     auto create_params = Browser::CreateParams::CreateForDevTools(profile_);
+#if BUILDFLAG(ENABLE_CEF)
     create_params.opener = opener;
+#endif
 
     browser_ = Browser::Create(std::move(create_params));
     browser_->GetTabStripModel()->AddWebContents(

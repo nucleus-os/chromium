@@ -576,7 +576,12 @@ void ExternalBeginFrameSource::RemoveObserver(BeginFrameObserver* obs) {
 }
 
 void ExternalBeginFrameSource::OnGpuNoLongerBusy() {
-  OnBeginFrame(pending_begin_frame_args_);
+  if (pending_begin_frame_args_.IsValid())
+    OnBeginFrame(pending_begin_frame_args_);
+  pending_begin_frame_args_ = BeginFrameArgs();
+}
+
+void ExternalBeginFrameSource::CancelPendingBeginFrame() {
   pending_begin_frame_args_ = BeginFrameArgs();
 }
 

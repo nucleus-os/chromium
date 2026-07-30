@@ -72,6 +72,7 @@
 #include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/gfx/switches.h"
 #include "ui/gl/gl_switches.h"
+#include "mojo/public/cpp/bindings/callback_helpers.h"
 
 #if BUILDFLAG(IS_WIN)
 #include "base/time/time.h"
@@ -764,6 +765,11 @@ void Compositor::IssueExternalBeginFrameNoAck(const viz::BeginFrameArgs& args) {
 void Compositor::IssueExternalBeginFrame(
     const viz::BeginFrameArgs& args,
     base::OnceCallback<void(const viz::BeginFrameAck&)> callback) {
+  callback = mojo::WrapCallbackWithDefaultInvokeIfNotRun(
+      std::move(callback),
+      viz::BeginFrameAck(args.frame_id.source_id,
+                         args.frame_id.sequence_number,
+                         /*has_damage=*/false));
   if (!external_begin_frame_controller_) {
     // IssueExternalBeginFrame() shouldn't be called again before the previous
     // begin frame is acknowledged.
@@ -775,6 +781,21 @@ void Compositor::IssueExternalBeginFrame(
       args, std::move(callback));
 }
 #endif
+
+bool Compositor::AbortPendingExternalBeginFrame() {
+  DCHECK(use_external_begin_frame_control());
+  if (pending_begin_frame_args_) {
+    // Destroying the wrapped callback completes it with the original frame
+    // identity supplied by IssueExternalBeginFrame().
+    pending_begin_frame_args_.reset();
+    return true;
+  }
+  if (external_begin_frame_controller_) {
+    external_begin_frame_controller_->AbortPendingFrame();
+    return true;
+  }
+  return false;
+}
 
 CompositorMetricsTracker Compositor::RequestNewCompositorMetricsTracker() {
   return CompositorMetricsTracker(next_compositor_metrics_tracker_id_++,

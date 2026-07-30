@@ -291,6 +291,13 @@ void NativeThemeFluent::PaintScrollbarTrack(
     const gfx::Rect& rect,
     bool forced_colors,
     PreferredContrast contrast) const {
+  // Overlay scrollbars float above page content, so painting an opaque track
+  // on hover obscures the content they are intended to preserve. Keep the
+  // track for accessibility modes that require additional contrast.
+  if (use_overlay_scrollbar() && !forced_colors &&
+      contrast != PreferredContrast::kMore) {
+    return;
+  }
   gfx::Rect track_fill_rect = rect;
   // See comments in `PaintArrowButton()` re: the condition here.
   if (forced_colors || contrast == PreferredContrast::kMore) {

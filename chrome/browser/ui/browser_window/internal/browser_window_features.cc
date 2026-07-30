@@ -239,10 +239,12 @@ BrowserWindowFeatures::~BrowserWindowFeatures() = default;
 
 // static
 bool BrowserWindowFeatures::IsNormalBrowser(const Browser* browser) {
+#if BUILDFLAG(ENABLE_CEF)
   // CEF normal browsers have TYPE_POPUP.
   if (browser->is_type_popup() && browser->cef_delegate()) {
     return true;
   }
+#endif
   return browser->is_type_normal();
 }
 
