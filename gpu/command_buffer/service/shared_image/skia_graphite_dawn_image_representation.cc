@@ -97,7 +97,8 @@ SkiaGraphiteDawnImageRepresentation::CreateBackendTextureHolders(
       SupportsMultiplanarRendering(context_state_.get());
   const bool supports_multiplanar_copy =
       SupportsMultiplanarCopy(context_state_.get());
-  if (format().is_multi_plane() && !format().PrefersExternalSampler()) {
+  if (format().is_multi_plane() &&
+      !GraphiteDawnUsesExternalSampler(format())) {
     CHECK(format() == viz::MultiPlaneFormat::kP010 ||
           format() == viz::MultiPlaneFormat::kP210 ||
           format() == viz::MultiPlaneFormat::kP410 ||

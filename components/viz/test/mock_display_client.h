@@ -29,12 +29,12 @@ class MockDisplayClient : public mojom::DisplayClient {
   mojo::PendingRemote<mojom::DisplayClient> BindRemote();
 
   // mojom::DisplayClient implementation.
+  MOCK_METHOD1(CreateLayeredWindowUpdater,
+               void(mojo::PendingReceiver<mojom::LayeredWindowUpdater>));
 #if BUILDFLAG(IS_APPLE)
   MOCK_METHOD1(OnDisplayReceivedCALayerParams, void(gfx::CALayerParams));
 #endif
 #if BUILDFLAG(IS_WIN)
-  MOCK_METHOD1(CreateLayeredWindowUpdater,
-               void(mojo::PendingReceiver<mojom::LayeredWindowUpdater>));
   MOCK_METHOD1(AddChildWindowToBrowser, void(gpu::SurfaceHandle child_window));
 #endif
 #if BUILDFLAG(IS_ANDROID)

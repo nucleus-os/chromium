@@ -25,6 +25,7 @@
 #include "components/viz/common/frame_sinks/begin_frame_source.h"
 #include "components/viz/service/display/display.h"
 #include "components/viz/service/display/output_surface.h"
+#include "components/viz/service/display_embedder/offscreen_output_connection.h"
 #include "components/viz/service/display_embedder/output_surface_provider.h"
 #include "components/viz/service/display_embedder/vsync_parameter_listener.h"
 #include "components/viz/service/frame_sinks/frame_sink_manager_impl.h"
@@ -129,10 +130,22 @@ RootCompositorFrameSinkImpl::Create(
       std::move(params->display_client));
   auto display_controller = output_surface_provider->CreateGpuDependency(
       params->gpu_compositing, params->widget);
+  std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection;
+  if (params->offscreen_output_client || params->offscreen_output) {
+    if (!params->offscreen_output_client || !params->offscreen_output) {
+      return nullptr;
+    }
+    offscreen_output_connection = std::make_unique<OffscreenOutputConnection>(
+        std::move(params->offscreen_output_client),
+        std::move(params->offscreen_output));
+    if (!offscreen_output_connection->is_valid()) {
+      return nullptr;
+    }
+  }
   auto output_surface = output_surface_provider->CreateOutputSurface(
       params->widget, params->gpu_compositing, display_client.get(),
       display_controller.get(), params->renderer_settings, debug_settings,
-      params->use_proxy_output_device);
+      params->use_proxy_output_device, std::move(offscreen_output_connection));
 
   // Creating output surface failed. The host can send a new request, possibly
   // with a different compositing mode.

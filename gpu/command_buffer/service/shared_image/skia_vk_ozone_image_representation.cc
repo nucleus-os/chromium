@@ -88,15 +88,18 @@ std::vector<sk_sp<SkSurface>> SkiaVkOzoneImageRepresentation::BeginWriteAccess(
     std::unique_ptr<skgpu::MutableTextureState>* end_state) {
   DCHECK_EQ(mode_, RepresentationAccessMode::kNone);
 
-  if (!BeginAccess(/*readonly=*/false, begin_semaphores, end_semaphores))
+  if (!BeginAccess(/*readonly=*/false, begin_semaphores, end_semaphores)) {
     return {};
+  }
 
   auto* gr_context = context_state_->gr_context();
   if (gr_context->abandoned()) {
     LOG(ERROR) << "GrContext is abandoned.";
-    ozone_backing()->EndAccess(/*readonly=*/false,
-                               OzoneImageBacking::AccessStream::kVulkan,
-                               gfx::GpuFenceHandle());
+    backing_access_.reset();
+    ResetSemaphores();
+    explicit_vulkan_access_ = false;
+    external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
+    mode_ = RepresentationAccessMode::kNone;
     return {};
   }
 
@@ -114,9 +117,11 @@ std::vector<sk_sp<SkSurface>> SkiaVkOzoneImageRepresentation::BeginWriteAccess(
           &surface_props);
       if (!surface) {
         LOG(ERROR) << "MakeFromBackendTexture() failed.";
-        ozone_backing()->EndAccess(/*readonly=*/false,
-                                   OzoneImageBacking::AccessStream::kVulkan,
-                                   gfx::GpuFenceHandle());
+        backing_access_.reset();
+        ResetSemaphores();
+        explicit_vulkan_access_ = false;
+        external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
+        mode_ = RepresentationAccessMode::kNone;
         return {};
       }
       surfaces_.push_back(std::move(surface));
@@ -125,6 +130,9 @@ std::vector<sk_sp<SkSurface>> SkiaVkOzoneImageRepresentation::BeginWriteAccess(
   }
 
   *end_state = GetEndAccessState();
+  if (!backing_access_->acquire_committed()) {
+    backing_access_->CommitAcquire();
+  }
 
   return surfaces_;
 }
@@ -141,6 +149,9 @@ SkiaVkOzoneImageRepresentation::BeginWriteAccess(
   }
 
   *end_state = GetEndAccessState();
+  if (!backing_access_->acquire_committed()) {
+    backing_access_->CommitAcquire();
+  }
 
   return promise_textures_;
 }
@@ -167,6 +178,9 @@ SkiaVkOzoneImageRepresentation::BeginReadAccess(
   }
 
   *end_state = GetEndAccessState();
+  if (!backing_access_->acquire_committed()) {
+    backing_access_->CommitAcquire();
+  }
 
   return promise_textures_;
 }
@@ -195,32 +209,131 @@ bool SkiaVkOzoneImageRepresentation::BeginAccess(
   DCHECK(begin_semaphores);
   DCHECK(end_access_semaphore_ == VK_NULL_HANDLE);
 
-  std::vector<gfx::GpuFenceHandle> fences;
-  if (!ozone_backing()->BeginAccess(readonly,
-                                    OzoneImageBacking::AccessStream::kVulkan,
-                                    &fences, need_end_fence_))
+  backing_access_ = ozone_backing()->BeginAccess(
+      readonly, OzoneImageBacking::AccessStream::kVulkan);
+  if (!backing_access_) {
     return false;
+  }
 
   VkDevice device = vk_device();
   auto* implementation = vk_implementation();
 
+  std::vector<gfx::GpuFenceHandle> fences = backing_access_->TakeBeginFences();
+  explicit_vulkan_access_ = NeedsExternalOwnershipTransfer();
+  if (explicit_vulkan_access_ &&
+      external_queue_family_ == VK_QUEUE_FAMILY_IGNORED) {
+    LOG(ERROR) << "Cannot determine one external Vulkan queue family for all "
+                  "Ganesh image planes";
+    backing_access_.reset();
+    explicit_vulkan_access_ = false;
+    return false;
+  }
+  std::optional<ExternalVulkanImageState> external_state;
+  if (explicit_vulkan_access_) {
+    if (!backing_access_->TakeExternalVulkanImageState(&external_state)) {
+      backing_access_.reset();
+      explicit_vulkan_access_ = false;
+      external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
+      return false;
+    }
+    if (external_state &&
+        (!external_state->IsValid() ||
+         external_state->external_queue_family != external_queue_family_)) {
+      LOG(ERROR) << "Invalid external Vulkan layout state for Ganesh";
+      backing_access_.reset();
+      explicit_vulkan_access_ = false;
+      external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
+      return false;
+    }
+    if (!external_state && IsCleared()) {
+      if (ozone_backing()->has_vulkan_ownership_history_) {
+        LOG(ERROR) << "Initialized Ozone image lost its Vulkan ownership state";
+        backing_access_.reset();
+        explicit_vulkan_access_ = false;
+        external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
+        return false;
+      }
+      // Preserve an initialized native pixmap on its first Vulkan acquire.
+      // Once Vulkan has owned it, EndVulkan() records the exact state and this
+      // bootstrap path is no longer permitted.
+      external_state = ExternalVulkanImageState{
+          .old_layout = VK_IMAGE_LAYOUT_GENERAL,
+          .new_layout = VK_IMAGE_LAYOUT_GENERAL,
+          .external_queue_family = external_queue_family_};
+    }
+  }
+
+  std::vector<GrBackendSemaphore> imported_semaphores;
   for (auto& fence : fences) {
     VkSemaphore vk_semaphore = implementation->ImportSemaphoreHandle(
         device, SemaphoreHandle(std::move(fence)));
+    if (vk_semaphore == VK_NULL_HANDLE) {
+      backing_access_.reset();
+      ResetSemaphores();
+      explicit_vulkan_access_ = false;
+      external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
+      return false;
+    }
 
     begin_access_semaphores_.emplace_back(vk_semaphore);
-    begin_semaphores->emplace_back(GrBackendSemaphores::MakeVk(vk_semaphore));
+    imported_semaphores.emplace_back(GrBackendSemaphores::MakeVk(vk_semaphore));
   }
 
-  if (end_semaphores && need_end_fence_) {
+  if (explicit_vulkan_access_) {
+    GrDirectContext* gr_context = context_state_->gr_context();
+    if (!imported_semaphores.empty() &&
+        !gr_context->wait(imported_semaphores.size(),
+                          imported_semaphores.data(),
+                          /*deleteSemaphoresAfterWait=*/false)) {
+      backing_access_.reset();
+      ResetSemaphores();
+      explicit_vulkan_access_ = false;
+      external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
+      return false;
+    }
+
+    // Ganesh accepted the wait. A later failure cannot restore the producer's
+    // transfer as though no acquire work had been recorded.
+    backing_access_->CommitAcquire();
+    if (external_state) {
+      const uint32_t local_queue_family = context_state_->vk_context_provider()
+                                              ->GetDeviceQueue()
+                                              ->GetVulkanQueueIndex();
+      const skgpu::MutableTextureState acquire_state =
+          skgpu::MutableTextureStates::MakeVulkan(external_state->new_layout,
+                                                  local_queue_family);
+      for (const auto& promise_texture : promise_textures_) {
+        GrBackendTexture backend_texture = promise_texture->backendTexture();
+        backend_texture.setMutableState(skgpu::MutableTextureStates::MakeVulkan(
+            external_state->old_layout, external_state->external_queue_family));
+        if (!gr_context->setBackendTextureState(backend_texture,
+                                                acquire_state)) {
+          LOG(ERROR) << "Failed to record external Vulkan acquire for Ganesh";
+          backing_access_->InvalidateAfterAcquire();
+          backing_access_.reset();
+          ResetSemaphores();
+          explicit_vulkan_access_ = false;
+          external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
+          return false;
+        }
+      }
+    }
+  } else {
+    begin_semaphores->insert(begin_semaphores->end(),
+                             imported_semaphores.begin(),
+                             imported_semaphores.end());
+  }
+
+  if (end_semaphores && backing_access_->needs_end_fence()) {
     end_access_semaphore_ =
         vk_implementation()->CreateExternalSemaphore(vk_device());
 
     if (end_access_semaphore_ == VK_NULL_HANDLE) {
       DLOG(ERROR) << "Failed to create the external semaphore.";
-      ozone_backing()->EndAccess(readonly,
-                                 OzoneImageBacking::AccessStream::kVulkan,
-                                 gfx::GpuFenceHandle());
+      backing_access_.reset();
+      ResetSemaphores();
+      explicit_vulkan_access_ = false;
+      external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
       return false;
     }
 
@@ -239,12 +352,31 @@ void SkiaVkOzoneImageRepresentation::EndAccess(bool readonly) {
     SemaphoreHandle semaphore_handle = vk_implementation()->GetSemaphoreHandle(
         vk_device(), end_access_semaphore_);
     fence = std::move(semaphore_handle).ToGpuFenceHandle();
-    DLOG_IF(ERROR, fence.is_null()) << "Failed to convert the external semaphore to fence.";
+    DLOG_IF(ERROR, fence.is_null())
+        << "Failed to convert the external semaphore to fence.";
   }
 
-  ozone_backing()->EndAccess(readonly, OzoneImageBacking::AccessStream::kVulkan,
-                             std::move(fence));
+  if (explicit_vulkan_access_) {
+    std::optional<ExternalVulkanImageState> release_state =
+        GetReleaseVulkanState();
+    if (release_state) {
+      backing_access_->EndVulkan(std::move(fence), *release_state);
+    } else {
+      LOG(ERROR) << "Ganesh did not return exact Vulkan ownership state";
+      backing_access_->InvalidateAfterAcquire();
+    }
+  } else {
+    backing_access_->End(std::move(fence));
+  }
+  backing_access_.reset();
 
+  ResetSemaphores();
+  explicit_vulkan_access_ = false;
+  external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
+  mode_ = RepresentationAccessMode::kNone;
+}
+
+void SkiaVkOzoneImageRepresentation::ResetSemaphores() {
   std::vector<VkSemaphore> semaphores = std::move(begin_access_semaphores_);
   begin_access_semaphores_.clear();
   if (end_access_semaphore_ != VK_NULL_HANDLE) {
@@ -258,12 +390,20 @@ void SkiaVkOzoneImageRepresentation::EndAccess(bool readonly) {
     fence_helper->EnqueueSemaphoresCleanupForSubmittedWork(
         std::move(semaphores));
   }
-
-  mode_ = RepresentationAccessMode::kNone;
 }
 
 std::unique_ptr<skgpu::MutableTextureState>
 SkiaVkOzoneImageRepresentation::GetEndAccessState() {
+  if (!explicit_vulkan_access_) {
+    return nullptr;
+  }
+
+  return std::make_unique<skgpu::MutableTextureState>(
+      skgpu::MutableTextureStates::MakeVulkan(VK_IMAGE_LAYOUT_UNDEFINED,
+                                              external_queue_family_));
+}
+
+bool SkiaVkOzoneImageRepresentation::NeedsExternalOwnershipTransfer() {
   // `kSingleDeviceUsage` defines the set of usages for which only the Vulkan
   // device from SharedContextState is used. If the SI has any usages outside
   // this set (e.g., if it has any GLES2 usage), then it will be accessed
@@ -284,16 +424,45 @@ SkiaVkOzoneImageRepresentation::GetEndAccessState() {
     // All VkImages must be allocated for the same queue family.
     for (const auto& vulkan_image : vulkan_images_) {
       if (vulkan_image->queue_family_index() != queue_family_index) {
-        return nullptr;
+        external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
+        return true;
       }
     }
-    DCHECK_NE(queue_family_index, VK_QUEUE_FAMILY_IGNORED);
-
-    return std::make_unique<skgpu::MutableTextureState>(
-        skgpu::MutableTextureStates::MakeVulkan(VK_IMAGE_LAYOUT_UNDEFINED,
-                                                queue_family_index));
+    if (queue_family_index == VK_QUEUE_FAMILY_IGNORED) {
+      external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
+      return true;
+    }
+    external_queue_family_ = queue_family_index;
+    return true;
   }
-  return nullptr;
+  external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
+  return false;
+}
+
+std::optional<ExternalVulkanImageState>
+SkiaVkOzoneImageRepresentation::GetReleaseVulkanState() const {
+  std::optional<ExternalVulkanImageState> release_state;
+  for (const auto& promise_texture : promise_textures_) {
+    GrVkImageInfo image_info;
+    if (!GrBackendTextures::GetVkImageInfo(promise_texture->backendTexture(),
+                                           &image_info)) {
+      return std::nullopt;
+    }
+    ExternalVulkanImageState plane_state{
+        .old_layout = image_info.fImageLayout,
+        .new_layout = image_info.fImageLayout,
+        .external_queue_family = image_info.fCurrentQueueFamily,
+    };
+    if (!plane_state.IsValid() ||
+        plane_state.external_queue_family != external_queue_family_) {
+      return std::nullopt;
+    }
+    if (release_state && *release_state != plane_state) {
+      return std::nullopt;
+    }
+    release_state = plane_state;
+  }
+  return release_state;
 }
 
 }  // namespace gpu

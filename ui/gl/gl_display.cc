@@ -8,6 +8,11 @@
 #include <type_traits>
 #include <vector>
 
+#if defined(__linux__)
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
+#endif
+
 #include "base/command_line.h"
 #include "base/debug/crash_logging.h"
 #include "base/export_template.h"
@@ -66,6 +71,52 @@ EGLDisplay GetPlatformANGLEDisplay(
     const std::vector<EGLAttrib>& extra_display_attribs) {
   TRACE_EVENT("gpu,startup", "gl_display::GetPlatformANGLEDisplay");
   std::vector<EGLAttrib> display_attribs(extra_display_attribs);
+
+  const base::CommandLine* process_command_line =
+      base::CommandLine::ForCurrentProcess();
+  if (platform_type == EGL_PLATFORM_ANGLE_TYPE_VULKAN_ANGLE &&
+      process_command_line->HasSwitch(switches::kVulkanDeviceUuid)) {
+    static const std::vector<uint8_t>* const preferred_uuid = [] {
+      auto* value = new std::vector<uint8_t>();
+      const base::CommandLine* command_line =
+          base::CommandLine::ForCurrentProcess();
+      const std::string uuid =
+          command_line->GetSwitchValueASCII(switches::kVulkanDeviceUuid);
+      if (!base::HexStringToBytes(uuid, value) || value->size() != 16U) {
+        LOG(ERROR) << "Invalid Vulkan device UUID; expected exactly "
+                      "32 hexadecimal digits";
+        value->clear();
+      }
+      return value;
+    }();
+    if (preferred_uuid->size() != 16U) {
+      return EGL_NO_DISPLAY;
+    }
+    display_attribs.push_back(EGL_PLATFORM_ANGLE_VULKAN_DEVICE_UUID_ANGLE);
+    display_attribs.push_back(
+        reinterpret_cast<EGLAttrib>(preferred_uuid->data()));
+  }
+
+#if BUILDFLAG(IS_LINUX)
+  if (platform_type == EGL_PLATFORM_ANGLE_TYPE_VULKAN_ANGLE) {
+    const std::string render_node =
+        process_command_line->GetSwitchValueASCII("render-node-override");
+    if (!render_node.empty()) {
+      struct stat node_stat {};
+      if (stat(render_node.c_str(), &node_stat) != 0 ||
+          !S_ISCHR(node_stat.st_mode)) {
+        LOG(ERROR) << "Invalid DRM render node for ANGLE: " << render_node;
+        return EGL_NO_DISPLAY;
+      }
+      display_attribs.push_back(
+          EGL_PLATFORM_ANGLE_DRM_RENDER_NODE_MAJOR_ANGLE);
+      display_attribs.push_back(major(node_stat.st_rdev));
+      display_attribs.push_back(
+          EGL_PLATFORM_ANGLE_DRM_RENDER_NODE_MINOR_ANGLE);
+      display_attribs.push_back(minor(node_stat.st_rdev));
+    }
+  }
+#endif
 
   display_attribs.push_back(EGL_PLATFORM_ANGLE_TYPE_ANGLE);
   display_attribs.push_back(static_cast<EGLAttrib>(platform_type));

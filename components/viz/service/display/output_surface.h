@@ -103,6 +103,11 @@ class VIZ_SERVICE_EXPORT OutputSurface {
     bool supports_viewporter = false;
     // OutputSurface's orientation mode.
     OrientationMode orientation_mode = OrientationMode::kLogic;
+    // Whether backdrop-filtered layers on a transparent root consume the
+    // captured destination within their exact backdrop bounds before restore.
+    // This is for outputs that will be composited over an external backdrop;
+    // ordinary web rendering retains source-over composition.
+    bool backdrop_filters_replace_destination = false;
 #if BUILDFLAG(IS_WIN)
     // Whether this OutputSurface supports direct composition layers.
     DCSupportLevel dc_support_level = DCSupportLevel::kNone;

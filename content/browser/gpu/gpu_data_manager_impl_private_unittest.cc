@@ -462,6 +462,28 @@ TEST_F(GpuDataManagerImplPrivateTest, GpuStartsWithGraphiteFeatureFlag) {
   EXPECT_EQ(gpu::GpuMode::HARDWARE_GRAPHITE, manager->GetGpuMode());
 }
 
+TEST_F(GpuDataManagerImplPrivateTest,
+       RequiredGraphiteDawnVulkanHasNoFallback) {
+  base::test::ScopedCommandLine scoped_command_line;
+  base::CommandLine* command_line =
+      scoped_command_line.GetProcessCommandLine();
+  command_line->AppendSwitch(switches::kEnableSkiaGraphite);
+  command_line->AppendSwitchASCII(switches::kSkiaGraphiteDawnBackend,
+                                  switches::kSkiaGraphiteDawnBackendVulkan);
+  command_line->AppendSwitch(
+      switches::kRequireSkiaGraphiteDawnVulkan);
+
+  ScopedGpuDataManagerImplPrivate manager;
+  EXPECT_EQ(gpu::GpuMode::HARDWARE_GRAPHITE, manager->GetGpuMode());
+  EXPECT_FALSE(manager->CanFallback());
+
+  gpu::GpuPreferences preferences;
+  manager->UpdateGpuPreferences(&preferences, GPU_PROCESS_KIND_SANDBOXED);
+  EXPECT_EQ(preferences.gr_context_type,
+            gpu::GrContextType::kGraphiteDawn);
+  EXPECT_TRUE(preferences.fallback_gr_context_types.empty());
+}
+
 // On Mac-ARM graphite should fallback to Swiftshader immediately. On other
 // platforms graphite should fallback to Ganesh/GL.
 TEST_F(GpuDataManagerImplPrivateTest, FallbackFromGraphite) {

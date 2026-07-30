@@ -53,6 +53,7 @@ class DawnOzoneImageRepresentation : public DawnImageRepresentation {
   std::vector<wgpu::TextureFormat> view_formats_;
   scoped_refptr<gfx::NativePixmap> pixmap_;
   wgpu::Texture texture_;
+  std::unique_ptr<OzoneImageBacking::ScopedAccess> backing_access_;
   bool is_readonly_ = false;
   wgpu::SharedTextureMemory shared_texture_memory_;
 };

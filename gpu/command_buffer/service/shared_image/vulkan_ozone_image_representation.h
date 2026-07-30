@@ -9,9 +9,10 @@
 
 #if BUILDFLAG(ENABLE_VULKAN)
 
-#include "gpu/command_buffer/service/shared_image/shared_image_representation.h"
-
 #include <vulkan/vulkan_core.h>
+
+#include "gpu/command_buffer/service/shared_image/ozone_image_backing.h"
+#include "gpu/command_buffer/service/shared_image/shared_image_representation.h"
 
 namespace gpu {
 
@@ -41,6 +42,7 @@ class GPU_GLES2_EXPORT VulkanOzoneImageRepresentation
   gpu::OzoneImageBacking* ozone_backing() const {
     return reinterpret_cast<gpu::OzoneImageBacking*>(backing());
   }
+  std::unique_ptr<OzoneImageBacking::ScopedAccess> backing_access_;
 };
 
 }  // namespace gpu

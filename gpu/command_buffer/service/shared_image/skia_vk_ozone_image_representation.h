@@ -74,6 +74,9 @@ class SkiaVkOzoneImageRepresentation : public SkiaGaneshImageRepresentation {
                    std::vector<GrBackendSemaphore>* begin_semaphores,
                    std::vector<GrBackendSemaphore>* end_semaphores);
   void EndAccess(bool readonly);
+  void ResetSemaphores();
+  bool NeedsExternalOwnershipTransfer();
+  std::optional<ExternalVulkanImageState> GetReleaseVulkanState() const;
   std::unique_ptr<skgpu::MutableTextureState> GetEndAccessState();
 
   VkDevice vk_device();
@@ -85,7 +88,9 @@ class SkiaVkOzoneImageRepresentation : public SkiaGaneshImageRepresentation {
   scoped_refptr<SharedContextState> context_state_;
   std::vector<VkSemaphore> begin_access_semaphores_;
   VkSemaphore end_access_semaphore_ = VK_NULL_HANDLE;
-  bool need_end_fence_;
+  std::unique_ptr<OzoneImageBacking::ScopedAccess> backing_access_;
+  bool explicit_vulkan_access_ = false;
+  uint32_t external_queue_family_ = VK_QUEUE_FAMILY_IGNORED;
 };
 
 }  // namespace gpu

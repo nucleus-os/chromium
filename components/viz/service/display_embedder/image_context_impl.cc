@@ -206,7 +206,9 @@ void ImageContextImpl::CreateFallbackImage(
     TRACE_EVENT_END("viz", "result", CreateFallbackImageResultToString(result));
   };
 
-  if (format().PrefersExternalSampler()) {
+  if (format().PrefersExternalSampler() &&
+      (!context_state->graphite_shared_context() ||
+       gpu::GraphiteDawnUsesExternalSampler(format()))) {
     // Skia can't allocate a fallback texture since the original texture was
     // externally allocated.
     result = CreateFallbackImageResult::kFailedPrefersExternalSampler;
@@ -441,9 +443,13 @@ bool ImageContextImpl::BeginAccessIfNecessaryInternal(
     return false;
   }
 
-  // Only one promise texture for external sampler case.
-  int num_planes =
-      format().PrefersExternalSampler() ? 1 : format().NumberOfPlanes();
+  // Only one promise texture when Graphite-Dawn can actually consume the
+  // platform's native external-sampler representation.
+  const bool use_external_sampler =
+      format().PrefersExternalSampler() &&
+      (!context_state->graphite_shared_context() ||
+       gpu::GraphiteDawnUsesExternalSampler(format()));
+  int num_planes = use_external_sampler ? 1 : format().NumberOfPlanes();
   if (context_state->graphite_shared_context()) {
 #if BUILDFLAG(IS_ANDROID) && BUILDFLAG(SKIA_USE_DAWN)
     // In the case of video decoding, it is possible for there to be a mismatch

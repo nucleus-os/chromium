@@ -6,6 +6,7 @@
 
 #include "components/viz/service/display/display_compositor_memory_and_task_controller.h"
 #include "components/viz/service/display/software_output_device.h"
+#include "components/viz/service/display_embedder/offscreen_output_connection.h"
 #include "components/viz/test/fake_output_surface.h"
 #include "components/viz/test/fake_skia_output_surface.h"
 
@@ -31,7 +32,10 @@ std::unique_ptr<OutputSurface> TestOutputSurfaceProvider::CreateOutputSurface(
     DisplayCompositorMemoryAndTaskController* display_controller,
     const RendererSettings& renderer_settings,
     const DebugRendererSettings* debug_settings,
-    bool use_proxy_output_device) {
+    bool use_proxy_output_device,
+    std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection) {
+  last_output_had_offscreen_connection_ =
+      offscreen_output_connection && offscreen_output_connection->is_valid();
   if (gpu_compositing) {
     return FakeSkiaOutputSurface::Create3d();
   } else {

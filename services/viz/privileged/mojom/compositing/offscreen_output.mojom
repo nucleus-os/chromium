@@ -1,0 +1,82 @@
+// Copyright 2026 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+module viz.mojom;
+
+import "mojo/public/mojom/base/time.mojom";
+import "services/viz/public/mojom/compositing/shared_image_format.mojom";
+import "skia/public/mojom/image_info.mojom";
+import "ui/gfx/geometry/mojom/geometry.mojom";
+import "ui/gfx/mojom/color_space.mojom";
+import "ui/gfx/mojom/gpu_fence_handle.mojom";
+import "ui/gfx/mojom/native_handle_types.mojom";
+
+// Canonical image origin used by an exported offscreen output frame.
+enum OffscreenOutputOrigin {
+  kTopLeft,
+  kBottomLeft,
+};
+
+// Fatal errors reported by an exportable offscreen output. The connection is
+// closed after an error and callers must recreate the root compositor frame
+// sink before requesting more frames.
+enum OffscreenOutputError {
+  kUnsupported,
+  kAllocationFailed,
+  kContextLost,
+  kProtocolError,
+  kSynchronizationStateLost,
+};
+
+// A completed root-compositor output image borrowed by an external consumer.
+// Every valid frame_token must be acknowledged after browser-side dispatch and
+// released exactly once before its backing can be reused. Acknowledgement and
+// release are deliberately separate: the browser can finish a Viz swap while
+// the external consumer continues displaying the immutable backing.
+struct OffscreenOutputFrame {
+  uint64 generation;
+  uint32 slot_index;
+  uint64 content_serial;
+  uint64 frame_token;
+
+  gfx.mojom.Size coded_size;
+  gfx.mojom.Rect visible_rect;
+  gfx.mojom.Rect damage_rect;
+
+  SharedImageFormat format;
+  gfx.mojom.ColorSpace color_space;
+  skia.mojom.AlphaType alpha_type;
+  OffscreenOutputOrigin origin;
+  // Vulkan queue family that owns the image at the external handoff.
+  uint32 queue_family_index;
+  // Exact layout pair used by Viz's external ownership-release barrier.
+  uint32 producer_old_layout;
+  uint32 producer_new_layout;
+
+  // Owns duplicated native-pixmap plane descriptors for transfer to the
+  // external consumer.
+  gfx.mojom.NativePixmapHandle native_pixmap;
+  gfx.mojom.GpuFenceHandle acquire_fence;
+
+  mojo_base.mojom.TimeTicks frame_time;
+  uint64 swap_trace_id;
+};
+
+// Implemented by the privileged browser-side consumer.
+interface OffscreenOutputClient {
+  OnFrameAvailable(OffscreenOutputFrame frame);
+  OnOutputError(OffscreenOutputError error);
+};
+
+// Implemented by Viz for an explicitly requested exportable offscreen root.
+interface OffscreenOutput {
+  // Acknowledges that the browser process finished dispatching frame_token to
+  // the external consumer. This completes Viz's swap-pacing transaction but
+  // does not permit the backing to be reused.
+  AcknowledgeFrame(uint64 frame_token);
+
+  // Returns the consumer-completion fence for frame_token. A null fence is not
+  // permission to recycle the backing and is treated as a protocol error.
+  ReleaseFrame(uint64 frame_token, gfx.mojom.GpuFenceHandle release_fence);
+};

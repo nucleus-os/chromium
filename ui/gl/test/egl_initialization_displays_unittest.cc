@@ -57,6 +57,10 @@ TEST(EGLInitializationDisplaysTest, DefaultRenderers) {
                                          true, command_line.get(),
                                          &default_no_flag_displays);
   EXPECT_FALSE(default_no_flag_displays.empty());
+#if BUILDFLAG(IS_LINUX)
+  EXPECT_EQ(default_no_flag_displays,
+            std::vector<gl::DisplayType>({gl::ANGLE_VULKAN}));
+#endif
 
   // Default with --use-angle flag
   command_line->AppendSwitchASCII(switches::kUseANGLE,

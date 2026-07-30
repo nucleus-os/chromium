@@ -283,6 +283,7 @@ static const char* const kSwitchNames[] = {
     switches::kEnableWebGLDraftExtensions,
     switches::kEnableSkiaGraphite,
     switches::kEnableSkiaGraphitePrecompilation,
+    switches::kRequireSkiaGraphiteDawnVulkan,
     switches::kDoubleBufferCompositing,
     switches::kHeadless,
     switches::kEnableLowEndDeviceMode,
@@ -299,6 +300,7 @@ static const char* const kSwitchNames[] = {
     switches::kTestGLLib,
     switches::kUseFakeMjpegDecodeAccelerator,
     switches::kUseGpuInTests,
+    switches::kVulkanDeviceUuid,
     switches::kWebViewDrawFunctorUsesVulkan,
     switches::kSuppressPerformanceLogs,
 #if BUILDFLAG(IS_MAC)

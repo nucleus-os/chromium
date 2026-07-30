@@ -140,8 +140,10 @@ OzoneImageBackingFactory::CreateSharedImageInternal(
   scoped_refptr<gfx::NativePixmap> pixmap = surface_factory->CreateNativePixmap(
       surface_handle, device_queue, size, format,
       buffer_usage.value_or(GetBufferUsage(si_info.usage)));
-  // Fallback to GPU_READ if cannot create pixmap with SCANOUT
-  if (!pixmap) {
+  // A scanout SharedImage must remain presentable. Reallocating it as GPU_READ
+  // would defer the failure until overlay scheduling and silently break the
+  // zero-copy buffer contract.
+  if (!pixmap && !si_info.usage.Has(SHARED_IMAGE_USAGE_SCANOUT)) {
     pixmap = surface_factory->CreateNativePixmap(
         surface_handle, device_queue, size, format, gfx::BufferUsage::GPU_READ);
   }
@@ -257,8 +259,10 @@ bool OzoneImageBackingFactory::IsSupported(
       SHARED_IMAGE_USAGE_DISPLAY_READ | SHARED_IMAGE_USAGE_DISPLAY_WRITE);
   bool used_by_vulkan =
       used_by_skia && gr_context_type == GrContextType::kVulkan;
-  bool used_by_webgpu = usage.HasAny(SHARED_IMAGE_USAGE_WEBGPU_READ |
-                                     SHARED_IMAGE_USAGE_WEBGPU_WRITE);
+  bool used_by_webgpu =
+      usage.HasAny(SHARED_IMAGE_USAGE_WEBGPU_READ |
+                   SHARED_IMAGE_USAGE_WEBGPU_WRITE) ||
+      (used_by_skia && gr_context_type == GrContextType::kGraphiteDawn);
   bool used_by_gl = (HasGLES2ReadOrWriteUsage(usage)) ||
                     (used_by_skia && gr_context_type == GrContextType::kGL);
   if (used_by_vulkan && !CanImportNativePixmapToVulkan()) {
@@ -369,33 +373,28 @@ bool OzoneImageBackingFactory::CanVulkanSynchronizeGpuFence() {
 }
 
 bool OzoneImageBackingFactory::CanImportNativePixmapToWebGPU() {
-#if BUILDFLAG(IS_CHROMEOS)
-  // Safe to always return true here, as it's not possible to create a WebGPU
-  // adapter that doesn't support importing native pixmaps:
-  // https://source.chromium.org/chromium/chromium/src/+/main:gpu/command_buffer/service/webgpu_decoder_impl.cc;drc=daed597d580d450d36578c0cc53b4f72d3b507da;l=1291
-  // TODO(crbug.com/40855765): To check it without vk_context_provider.
+#if BUILDFLAG(IS_LINUX)
+  auto* dawn_context = shared_context_state_->dawn_context_provider();
+  return dawn_context &&
+         dawn_context->backend_type() == wgpu::BackendType::Vulkan &&
+         dawn_context->SupportsFeature(
+             wgpu::FeatureName::SharedTextureMemoryDmaBuf);
+#elif BUILDFLAG(IS_CHROMEOS)
   return true;
 #else
-  // Disable all WebGPU ozone usage for non-Chromeos Ozone (Fuchsia, Linux).
-  // WebGPU on non-ChromeOS will now go through the ExternalVkImageBacking. Long
-  // term we will return to using the ozone backing on devices that have sync
-  // fences.
-  // TODO(crbug.com/330385376): Support dynamic switching of fence types in
-  // dawn and runtime extension testing.
-  // This testing in runtime can be done where graphite is enabled by checking
-  // against features in the 'dawn_context_provider' in the
-  // 'shared_context_state_'.
   return false;
 #endif
 }
 
 bool OzoneImageBackingFactory::CanWebGPUSynchronizeGpuFence() {
-#if BUILDFLAG(IS_CHROMEOS)
-  // Dawn always use sync files on ChromeOS so it's safe to unconditionally
-  // return true here.
+#if BUILDFLAG(IS_LINUX)
+  auto* dawn_context = shared_context_state_->dawn_context_provider();
+  return dawn_context &&
+         dawn_context->backend_type() == wgpu::BackendType::Vulkan &&
+         dawn_context->SupportsFeature(wgpu::FeatureName::SharedFenceSyncFD);
+#elif BUILDFLAG(IS_CHROMEOS)
   return true;
 #else
-  // TODO: somehow check if Dawn is using sync files.
   return false;
 #endif
 }

@@ -6,7 +6,6 @@
 
 #include <algorithm>
 
-#include "base/check.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/containers/flat_map.h"
 #include "components/viz/common/resources/shared_image_format_utils.h"
@@ -37,8 +36,10 @@ GetDawnModifierMap(wgpu::Adapter adapter) {
   base::flat_map<viz::SharedImageFormat, std::vector<uint64_t>> modifier_map;
 
   for (auto si_format : ui::kDrmSharedImageFormats) {
-    auto wgpu_format = ToDawnFormat(si_format);
-    if (wgpu_format == wgpu::TextureFormat::Undefined) {
+    // The DRM list also contains GBM formats that Dawn cannot import. Use the
+    // non-fatal conversion contract while discovering adapter capabilities.
+    auto wgpu_format = MaybeToDawnFormat(si_format);
+    if (!wgpu_format) {
       modifier_map.emplace(si_format, std::vector<uint64_t>());
       continue;
     }
@@ -46,7 +47,7 @@ GetDawnModifierMap(wgpu::Adapter adapter) {
     wgpu::DawnDrmFormatCapabilities drmCapabilities;
     wgpu::DawnFormatCapabilities formatCapabilities;
     formatCapabilities.nextInChain = &drmCapabilities;
-    adapter.GetFormatCapabilities(wgpu_format, &formatCapabilities);
+    adapter.GetFormatCapabilities(*wgpu_format, &formatCapabilities);
 
     if (!drmCapabilities.properties || !drmCapabilities.propertiesCount) {
       modifier_map.emplace(si_format, std::vector<uint64_t>());
@@ -91,8 +92,11 @@ DrmModifiersFilterDawn::~DrmModifiersFilterDawn() = default;
 std::vector<uint64_t> DrmModifiersFilterDawn::Filter(
     viz::SharedImageFormat format,
     const std::vector<uint64_t>& modifiers) {
-  CHECK(viz::HasEquivalentBufferFormat(format));
-  const auto& modifier_set = modifier_map_.at(format);
+  const auto modifier_set_it = modifier_map_.find(format);
+  if (modifier_set_it == modifier_map_.end()) {
+    return {};
+  }
+  const auto& modifier_set = modifier_set_it->second;
 
   std::vector<uint64_t> intersection;
   for (const auto& modifier : modifiers) {

@@ -22,6 +22,7 @@ mojom("compositing") {
     "frame_sink_video_capture.mojom",
     "frame_sinks_metrics_recorder.mojom",  # test helpers
     "layered_window_updater.mojom",
+    "offscreen_output.mojom",
     "overlay_strategy.mojom",
     "renderer_settings.mojom",
     "vsync_parameter_observer.mojom",
