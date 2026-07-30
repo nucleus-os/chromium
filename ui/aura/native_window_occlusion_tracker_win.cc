@@ -103,6 +103,13 @@ void NativeWindowOcclusionTrackerWin::Enable(Window* window) {
   // when it's no longer true that all windows are minimized, and when the
   // window is destroyed.
   HWND root_window_hwnd = window->GetHost()->GetAcceleratedWidget();
+
+  // Delay occlusion tracking for initially-minimized windows.
+  // See CEF issue #3638.
+  if (IsIconic(root_window_hwnd)) {
+    return;
+  }
+
   window->AddObserver(this);
   // Remember this mapping from hwnd to Window*.
   hwnd_root_window_map_[root_window_hwnd] = window;

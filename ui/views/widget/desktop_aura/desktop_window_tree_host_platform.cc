@@ -283,8 +283,8 @@ void DesktopWindowTreeHostPlatform::Init(const Widget::InitParams& params) {
   if (properties.parent_widget) {
     window_parent_ = DesktopWindowTreeHostPlatform::GetHostForWidget(
         properties.parent_widget);
-    DCHECK(window_parent_);
-    window_parent_->window_children_.insert(this);
+    if (window_parent_)
+      window_parent_->window_children_.insert(this);
   }
 
   // Calculate initial bounds.

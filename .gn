@@ -156,6 +156,8 @@ exec_script_allowlist =
       # in the Chromium repo outside of //build.
       "//build_overrides/build.gni",
 
+      "//cef/BUILD.gn",
+
       "//chrome/version.gni",
 
       "//google_apis/BUILD.gn",

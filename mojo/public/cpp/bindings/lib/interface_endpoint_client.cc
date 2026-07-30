@@ -754,7 +754,8 @@ bool InterfaceEndpointClient::HandleIncomingMessage(Message* message) {
 }
 
 void InterfaceEndpointClient::NotifyError(
-    const std::optional<DisconnectReason>& reason) {
+    const std::optional<DisconnectReason>& reason,
+    MojoResult error_result) {
   TRACE_EVENT("toplevel", "Closed mojo endpoint",
               [&](perfetto::EventContext& ctx) {
                 auto* info = ctx.event()->set_chrome_mojo_event_info();
@@ -790,6 +791,14 @@ void InterfaceEndpointClient::NotifyError(
           .Run(reason->custom_reason, reason->description);
     } else {
       std::move(error_with_reason_handler_).Run(0, std::string());
+    }
+  } else if (error_with_reason_and_result_handler_) {
+    if (reason) {
+      std::move(error_with_reason_and_result_handler_)
+          .Run(reason->custom_reason, reason->description, error_result);
+    } else {
+      std::move(error_with_reason_and_result_handler_)
+          .Run(0, std::string(), error_result);
     }
   }
 }
@@ -935,7 +944,8 @@ void InterfaceEndpointClient::OnAssociationEvent(
     task_runner_->PostTask(FROM_HERE,
                            base::BindOnce(&InterfaceEndpointClient::NotifyError,
                                           weak_ptr_factory_.GetWeakPtr(),
-                                          handle_.disconnect_reason()));
+                                          handle_.disconnect_reason(),
+                                          MOJO_RESULT_OK));
   }
 }
 

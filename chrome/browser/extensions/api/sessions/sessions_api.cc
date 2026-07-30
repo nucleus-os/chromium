@@ -578,6 +578,7 @@ SessionsGetDevicesFunction::CreateWindowModel(
       state = api::windows::WindowState::kNormal;
       break;
     case ui::mojom::WindowShowState::kMinimized:
+    case ui::mojom::WindowShowState::kHidden:
       state = api::windows::WindowState::kMinimized;
       break;
     case ui::mojom::WindowShowState::kMaximized:

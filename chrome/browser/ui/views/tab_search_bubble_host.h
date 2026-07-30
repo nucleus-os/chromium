@@ -9,6 +9,7 @@
 #include "base/observer_list.h"
 #include "base/time/time.h"
 #include "chrome/browser/ui/views/bubble/webui_bubble_manager.h"
+#include "ui/views/view_tracker.h"
 #include "chrome/browser/ui/views/bubble/webui_bubble_manager_observer.h"
 #include "chrome/browser/ui/views/tabs/tab_slot_controller.h"
 #include "chrome/browser/ui/webui/tab_search/tab_search.mojom.h"
@@ -55,7 +56,7 @@ class TabSearchBubbleHost : public views::WidgetObserver,
 
   BrowserWindowInterface* GetBrowser();
 
-  views::View* button() { return button_; }
+  views::View* button() { return button_tracker_.view(); }
 
   WebUIBubbleManager* webui_bubble_manager_for_testing() {
     return webui_bubble_manager_.get();
@@ -72,7 +73,7 @@ class TabSearchBubbleHost : public views::WidgetObserver,
   TabSearchUI* GetTabSearchUI();
 
   // The anchor button for the tab search bubble.
-  const raw_ptr<views::Button> button_;
+  views::ViewTracker button_tracker_;
 
   const raw_ptr<Profile> profile_;
 
@@ -87,7 +88,7 @@ class TabSearchBubbleHost : public views::WidgetObserver,
 
   base::ObserverList<TabSearchBubbleHostObserver> observers_;
 
-  // A lock to keep its `button_` pressed while |bubble_| is showing or in the
+  // A lock to keep the button pressed while |bubble_| is showing or in the
   // process of being shown.
   std::unique_ptr<views::MenuButtonController::PressedLock> pressed_lock_;
 

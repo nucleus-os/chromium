@@ -200,7 +200,7 @@ void DirectoryLister::OnListFile(const DirectoryListerData& data) {
 }
 
 void DirectoryLister::OnListDone(int error) {
-  delegate_->OnListDone(error);
+  delegate_.ExtractAsDangling()->OnListDone(error);
 }
 
 }  // namespace net

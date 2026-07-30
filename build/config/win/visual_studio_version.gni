@@ -5,15 +5,14 @@
 declare_args() {
   # Path to Visual Studio. If empty, the default is used which is to use the
   # automatic toolchain in depot_tools. If set, you must also set the
-  # visual_studio_version, wdk_path and windows_sdk_version.
+  # visual_studio_version, visual_studio_runtime_dirs and windows_sdk_version.
   visual_studio_path = ""
 
   # Version of Visual Studio pointed to by the visual_studio_path.
   visual_studio_version = ""
 
-  # Directory of the Windows driver kit. If visual_studio_path is empty, this
-  # will be auto-filled.
-  wdk_path = ""
+  # Path to Visual Studio runtime libraries.
+  visual_studio_runtime_dirs = ""
 
   # Full path to the Windows SDK, not including a backslash at the end.
   # This value is the default location, override if you have a different
@@ -31,16 +30,15 @@ if (visual_studio_path == "") {
   windows_sdk_version = toolchain_data.sdk_version
   windows_sdk_path = toolchain_data.sdk_path
   visual_studio_version = toolchain_data.vs_version
-  wdk_path = toolchain_data.wdk_dir
   visual_studio_runtime_dirs = toolchain_data.runtime_dirs
 } else {
   assert(visual_studio_version != "",
          "You must set the visual_studio_version if you set the path")
+  assert(visual_studio_runtime_dirs != "",
+         "You must set the visual_studio_runtime_dirs if you set the visual " +
+         "studio path")
   assert(windows_sdk_version != "",
          "You must set the windows_sdk_version if you set the path")
-  assert(wdk_path != "",
-         "You must set the wdk_path if you set the visual studio path")
-  visual_studio_runtime_dirs = []
 }
 
 visual_studio_version_logs = [ "windows_sdk_version=${windows_sdk_version}" ]

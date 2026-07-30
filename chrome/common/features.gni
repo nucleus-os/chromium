@@ -6,6 +6,7 @@ import("//build/config/chrome_build.gni")
 import("//build/config/compiler/compiler.gni")
 import("//build/config/dcheck_always_on.gni")
 import("//build/config/features.gni")
+import("//cef/libcef/features/features.gni")
 import("//components/compose/features.gni")
 import("//components/safe_browsing/buildflags.gni")
 import("//components/signin/features.gni")
@@ -33,7 +34,7 @@ assert(use_blink, "Chromium without blink shouldn't use anything in //chrome")
 declare_args() {
   # Enables the build to have logging enabled by default.
   # This is intended for use only in developer builds.
-  chrome_enable_logging_by_default = is_debug
+  chrome_enable_logging_by_default = is_debug || enable_cef
 
   # Platforms for which Chrome supports a certificate management UI that
   # shows the Chrome Root Store. This is specific to the v2 UI that is
@@ -74,11 +75,13 @@ declare_args() {
   # optimize_webui was moved to ui/base/ui_features.gni
 }
 
+if (!enable_cef) {
 # Logging must be disabled by default in all official builds (including special
 # DCHECK-enabled builds). Logging is enabled by default for debug builds, and
 # may be selectively enabled by default for release builds.
 assert(!chrome_enable_logging_by_default || !is_official_build,
        "Logging must be disabled by default in Official builds")
+}
 
 # Use brlapi from brltty for braille display support.
 use_brlapi = is_chromeos

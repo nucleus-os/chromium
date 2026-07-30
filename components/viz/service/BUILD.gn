@@ -284,6 +284,8 @@ viz_component("service") {
     "transitions/surface_animation_manager.h",
     "transitions/transferable_resource_tracker.cc",
     "transitions/transferable_resource_tracker.h",
+    "//cef/libcef/browser/osr/software_output_device_proxy.cc",
+    "//cef/libcef/browser/osr/software_output_device_proxy.h",
   ]
 
   defines = [ "VIZ_SERVICE_IMPLEMENTATION" ]

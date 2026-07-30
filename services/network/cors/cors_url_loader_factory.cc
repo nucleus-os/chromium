@@ -644,7 +644,8 @@ bool CorsURLLoaderFactory::IsValidRequest(
           net::LOAD_DISABLE_CACHE | net::LOAD_PREFETCH |
           net::LOAD_IGNORE_LIMITS | net::LOAD_DO_NOT_USE_EMBEDDED_IDENTITY |
           net::LOAD_SUPPORT_ASYNC_REVALIDATION |
-          net::LOAD_RESTRICTED_PREFETCH_FOR_MAIN_FRAME)) {
+          net::LOAD_RESTRICTED_PREFETCH_FOR_MAIN_FRAME |
+          net::LOAD_DO_NOT_SEND_COOKIES | net::LOAD_DO_NOT_SAVE_COOKIES)) {
       mojo::ReportBadMessage(
           "CorsURLLoaderFactory: Untrusted caller using restricted load flag");
       return false;

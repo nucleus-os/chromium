@@ -4,6 +4,7 @@
 
 #include "net/url_request/url_request_job.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "base/compiler_specific.h"
@@ -40,6 +41,7 @@
 #include "net/url_request/redirect_info.h"
 #include "net/url_request/redirect_util.h"
 #include "net/url_request/url_request_context.h"
+#include "url/url_util.h"
 
 namespace net {
 
@@ -58,6 +60,16 @@ const scoped_refptr<base::SingleThreadTaskRunner>& TaskRunner(
     return net::GetTaskRunner(priority);
   }
   return base::SingleThreadTaskRunner::GetCurrentDefault();
+}
+
+bool IsSecureScheme(const GURL& url) {
+  if (!url.has_scheme()) {
+    return false;
+  }
+  if (GURL::SchemeIsCryptographic(url.scheme())) {
+    return true;
+  }
+  return std::ranges::contains(url::GetSecureSchemes(), url.scheme());
 }
 
 }  // namespace
@@ -341,8 +353,7 @@ GURL URLRequestJob::ComputeReferrerForPolicy(
     *same_origin_out_for_metrics = same_origin;
 
   bool secure_referrer_but_insecure_destination =
-      original_referrer.SchemeIsCryptographic() &&
-      !destination.SchemeIsCryptographic();
+      IsSecureScheme(original_referrer) && !IsSecureScheme(destination);
 
   switch (policy) {
     case ReferrerPolicy::CLEAR_ON_TRANSITION_FROM_SECURE_TO_INSECURE:

@@ -632,6 +632,11 @@ class CORE_EXPORT LocalDOMWindow final : public DOMWindow,
 
   void SetIsPictureInPictureWindow();
 
+  void SetMovePictureInPictureEnabled(bool enabled) {
+    move_pip_enabled_ = enabled;
+  }
+  bool MovePictureInPictureEnabled() const { return move_pip_enabled_; }
+
   // Return the viewport size including scrollbars.
   gfx::Size GetViewportSize() const;
 
@@ -739,6 +744,8 @@ class CORE_EXPORT LocalDOMWindow final : public DOMWindow,
   // If set, this window is a Document Picture in Picture window.
   // https://wicg.github.io/document-picture-in-picture/
   bool is_picture_in_picture_window_ = false;
+
+  bool move_pip_enabled_ = false;
 
   // Records this window's Storage Access API status. It cannot be downgraded.
   net::StorageAccessApiStatus storage_access_api_status_ =

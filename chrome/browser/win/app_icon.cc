@@ -18,13 +18,26 @@ int GetAppIconResourceId() {
   return install_static::InstallDetails::Get().app_icon_resource_id();
 }
 
+int g_exe_app_icon_resource_id = 0;
+
 }  // namespace
+
+void SetExeAppIconResourceId(int icon_id) {
+  g_exe_app_icon_resource_id = icon_id;
+}
 
 HICON GetAppIcon() {
   // TODO(mgiuca): Use GetAppIconImageFamily/CreateExact instead of LoadIcon, to
   // get correct scaling. (See http://crbug.com/40443246)
-  const int icon_id = GetAppIconResourceId();
   // HICON returned from LoadIcon do not leak and do not have to be destroyed.
+  if (g_exe_app_icon_resource_id > 0) {
+    // Try to load the icon from the exe first.
+    if (auto icon = LoadIcon(GetModuleHandle(NULL),
+            MAKEINTRESOURCE(g_exe_app_icon_resource_id))) {
+      return icon;
+    }
+  }
+  const int icon_id = GetAppIconResourceId();
   return LoadIcon(GetModuleHandle(chrome::kBrowserResourcesDll),
                   MAKEINTRESOURCE(icon_id));
 }
@@ -32,9 +45,18 @@ HICON GetAppIcon() {
 HICON GetSmallAppIcon() {
   // TODO(mgiuca): Use GetAppIconImageFamily/CreateExact instead of LoadIcon, to
   // get correct scaling. (See http://crbug.com/40443246)
-  const int icon_id = GetAppIconResourceId();
   gfx::Size size = GetSmallAppIconSize();
   // HICON returned from LoadImage must be released using DestroyIcon.
+  if (g_exe_app_icon_resource_id > 0) {
+    // Try to load the icon from the exe first.
+    if (auto icon = static_cast<HICON>(LoadImage(
+            GetModuleHandle(NULL), MAKEINTRESOURCE(g_exe_app_icon_resource_id),
+            IMAGE_ICON, size.width(), size.height(),
+            LR_DEFAULTCOLOR | LR_SHARED))) {
+      return icon;
+    }
+  }
+  const int icon_id = GetAppIconResourceId();
   return static_cast<HICON>(LoadImage(
       GetModuleHandle(chrome::kBrowserResourcesDll), MAKEINTRESOURCE(icon_id),
       IMAGE_ICON, size.width(), size.height(), LR_DEFAULTCOLOR | LR_SHARED));
@@ -50,15 +72,14 @@ gfx::Size GetSmallAppIconSize() {
 }
 
 std::unique_ptr<gfx::ImageFamily> GetAppIconImageFamily() {
+  if (g_exe_app_icon_resource_id > 0) {
+    // Try to load the icon from the exe first.
+    if (auto image_family = IconUtil::CreateImageFamilyFromIconResource(
+            GetModuleHandle(NULL), g_exe_app_icon_resource_id)) {
+      return image_family;
+    }
+  }
   const int icon_id = GetAppIconResourceId();
-  // Get the icon from chrome.dll (not chrome.exe, which has different resource
-  // IDs). If chrome.dll is not loaded, we are probably in a unit test, so fall
-  // back to getting the icon from the current module (assuming it is
-  // unit_tests.exe, that has the same resource IDs as chrome.dll).
-  HMODULE module = GetModuleHandle(chrome::kBrowserResourcesDll);
-  if (!module)
-    module = GetModuleHandle(nullptr);
-  DCHECK(module);
-
-  return IconUtil::CreateImageFamilyFromIconResource(module, icon_id);
+  return IconUtil::CreateImageFamilyFromIconResource(
+      GetModuleHandle(chrome::kBrowserResourcesDll), icon_id);
 }

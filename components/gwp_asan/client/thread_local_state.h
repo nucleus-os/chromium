@@ -8,6 +8,7 @@
 #include "base/check.h"
 #include "base/compiler_specific.h"
 #include "build/build_config.h"
+#include "cef/libcef/features/features.h"
 
 #if BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_ANDROID)
 // On macOS and Android (before Q), the first use of a `thread_local` variable
@@ -15,7 +16,7 @@
 // Also, `thread_local` goes through `emutls` on Android, which is slower than
 // `pthread_getspecific`.
 #define THREAD_LOCAL_STATE_USES_PARTITION_ALLOC_TLS
-#elif BUILDFLAG(IS_POSIX) && defined(COMPONENT_BUILD)
+#elif BUILDFLAG(IS_POSIX) && (defined(COMPONENT_BUILD) || BUILDFLAG(ENABLE_CEF))
 // On POSIX platforms when built as component build, use of a `thread_local`
 // variable may or may not cause a call to `free()` depending on an
 // implementation of TLS. At least in case of glibc/glibc/elf/dl-tls.c,

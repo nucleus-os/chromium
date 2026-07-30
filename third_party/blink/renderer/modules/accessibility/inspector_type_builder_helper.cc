@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/modules/accessibility/inspector_type_builder_helper.h"
 
+#include "cef/libcef/features/features.h"
 #include "third_party/blink/renderer/core/dom/dom_node_ids.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/inspector/identifiers_factory.h"
@@ -910,3 +911,7 @@ std::unique_ptr<AXNode> BuildProtocolAXNodeForUnignoredAXObject(
 }
 
 }  // namespace blink
+
+#if BUILDFLAG(ENABLE_CEF)
+#include "cef/libcef/renderer/accessibility/build_collapsed_summary_node.inc"
+#endif

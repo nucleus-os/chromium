@@ -160,6 +160,12 @@ class BASE_EXPORT CurrentThread {
       RegisterOnNextIdleCallbackPasskey,
       OnceClosure on_next_idle_callback);
 
+#if BUILDFLAG(IS_WIN)
+  void set_os_modal_loop(bool os_modal_loop) { os_modal_loop_ = os_modal_loop; }
+
+  bool os_modal_loop() const { return os_modal_loop_; }
+#endif  // OS_WIN
+
   // Enables nested task processing in scope of an upcoming native message loop.
   // Some unwanted message loops may occur when using common controls or printer
   // functions. Hence, nested task processing is disabled by default to avoid
@@ -233,6 +239,13 @@ class BASE_EXPORT CurrentThread {
   friend class web::WebTaskEnvironment;
 
   raw_ptr<sequence_manager::internal::SequenceManagerImpl> current_;
+
+#if BUILDFLAG(IS_WIN)
+ private:
+  // Should be set to true before calling Windows APIs like TrackPopupMenu, etc.
+  // which enter a modal message loop.
+  bool os_modal_loop_ = false;
+#endif
 };
 
 // UI extension of CurrentThread.

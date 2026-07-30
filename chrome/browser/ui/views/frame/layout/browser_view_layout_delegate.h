@@ -40,6 +40,7 @@ class BrowserViewLayoutDelegate {
       bool use_browser_bounds) const = 0;
   virtual WindowState GetBrowserWindowState() const = 0;
   virtual views::LayoutAlignment GetWindowTitleAlignment() const = 0;
+  virtual void UpdateDialogTopInsetInBrowserView(int* dialog_top_y) const = 0;
   virtual bool IsToolbarVisible() const = 0;
   virtual bool IsBookmarkBarVisible() const = 0;
   virtual bool IsInfobarVisible() const = 0;

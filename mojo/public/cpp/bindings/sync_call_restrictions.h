@@ -41,6 +41,7 @@ class Compositor;
 }  // namespace ui
 
 namespace viz {
+class GpuDisplayProvider;
 class GpuHostImpl;
 class HostFrameSinkManager;
 }  // namespace viz
@@ -110,6 +111,8 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) SyncCallRestrictions {
   // SynchronousCompositorHost is used for Android webview.
   friend class content::SynchronousCompositorHost;
   friend class mojo::ScopedAllowSyncCallForTesting;
+  // For query of whether to use SoftwareOutputDevice or not.
+  friend class viz::GpuDisplayProvider;
   friend class viz::GpuHostImpl;
   // For destroying the GL context/surface that draw to a platform window before
   // the platform window is destroyed.

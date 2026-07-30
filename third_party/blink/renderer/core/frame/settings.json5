@@ -1265,6 +1265,10 @@
       initial: false,
     },
     {
+      name: "accessibilityViewportCollapse",
+      initial: false,
+    },
+    {
       name: "bypassCSP",
       initial: false,
     },

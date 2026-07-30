@@ -824,7 +824,9 @@ SaveCardBubbleControllerImpl::GetAutofillBubbleHandler() {
   tabs::TabInterface* tab = tabs::TabInterface::GetFromContents(web_contents());
   CHECK(tab);
   BrowserWindowInterface* browser = tab->GetBrowserWindowInterface();
-  CHECK(browser);
+  if (!browser) {
+    return nullptr;
+  }
   return AutofillBubbleHandler::Get(browser->GetUnownedUserDataHost());
 }
 
@@ -834,6 +836,9 @@ void SaveCardBubbleControllerImpl::DoShowBubble() {
   }
 
   AutofillBubbleHandler* autofill_bubble_handler = GetAutofillBubbleHandler();
+  if (!autofill_bubble_handler) {
+    return;
+  }
   if (current_bubble_type_ == PaymentsBubbleType::kUploadComplete) {
     SetBubbleView(*autofill_bubble_handler->ShowSaveCardConfirmationBubble(
         web_contents(), this));

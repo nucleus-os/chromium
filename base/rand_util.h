@@ -246,8 +246,12 @@ class MetricsSubSampler;
 // system call to generate a new number, except to seed it.  This should *never*
 // be used for cryptographic applications, and is not thread-safe.
 //
-// It is seeded using base::RandUint64() in the constructor, meaning that it
-// doesn't need to be seeded. It can be re-seeded though, with
+// It is lazily seeded using base::RandUint64() on first use, meaning that it
+// doesn't need to be seeded. Seeding is deferred (rather than done in the
+// constructor) so that constructing one is allocator-safe: base::RandUint64()
+// can call into BoringSSL, which may allocate, and constructing this object on
+// a malloc-critical path (e.g. as part of a dynamic-init thread_local) would
+// otherwise cause reentrant malloc. It can be re-seeded though, with
 // ReseedForTesting(). Its period is long enough that it should not need to be
 // re-seeded during use.
 //
@@ -266,6 +270,10 @@ class BASE_EXPORT InsecureRandomGenerator {
   InsecureRandomGenerator();
   // State. These are mutable to allow Rand* functions to be declared as const.
   // This, in turn, enables use of `MetricsSubSampler` in const contexts.
+  //
+  // `(0, 0)` doubles as the "unseeded" sentinel: it is the unique fixed point
+  // of XorShift128+, so seeded state can never reach it, and it is also the
+  // default value of the members. See `RandUint64()` for the lazy-seed path.
   mutable uint64_t a_ = 0, b_ = 0;
 
   // Before adding a new friend class, make sure that the overhead of

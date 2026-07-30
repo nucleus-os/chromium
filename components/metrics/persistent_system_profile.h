@@ -64,6 +64,10 @@ class PersistentSystemProfile {
       const base::PersistentMemoryAllocator& memory_allocator,
       SystemProfileProto* system_profile);
 
+  // Detaches this object from the current thread in preparation for a move to
+  // a different thread.
+  void DetachFromCurrentThread();
+
  private:
   friend class PersistentSystemProfileTest;
 

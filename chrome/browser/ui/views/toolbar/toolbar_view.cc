@@ -256,12 +256,14 @@ void SetRefreshMargins(views::View* button, bool expanded) {
 
 DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(ToolbarView, kToolbarElementId);
 
-ToolbarView::ToolbarView(Browser* browser, BrowserView* browser_view)
+ToolbarView::ToolbarView(Browser* browser,
+                         BrowserView* browser_view,
+                         std::optional<DisplayMode> display_mode)
     : AnimationDelegateViews(this),
       browser_(browser),
       browser_view_(browser_view),
       app_menu_icon_controller_(browser->profile(), this),
-      display_mode_(GetDisplayMode(browser)) {
+      display_mode_(display_mode ? *display_mode : GetDisplayMode(browser)) {
   // WebApp type-browsers set their own ToolbarButtonProvider.
   if (!web_app::AppBrowserController::IsWebApp(browser)) {
     scoped_unowned_user_data_.emplace(browser_->GetUnownedUserDataHost(),
@@ -309,9 +311,24 @@ ToolbarView::~ToolbarView() {
   if (glic_nudge_controller) {
     glic_nudge_controller->SetToolbarDelegate(/*delegate=*/nullptr);
   }
+
+  browser_view_->WillDestroyToolbar();
 }
 
 void ToolbarView::Init() {
+#if BUILDFLAG(ENABLE_CEF)
+  using ToolbarButtonType = cef::BrowserDelegate::ToolbarButtonType;
+  auto button_visible = [this](ToolbarButtonType type) {
+    if (this->browser_->cef_delegate()) {
+      return this->browser_->cef_delegate()->IsToolbarButtonVisible(type);
+    }
+    return true;
+  };
+#define BUTTON_VISIBLE(type) button_visible(ToolbarButtonType::type)
+#else
+#define BUTTON_VISIBLE(type) true
+#endif
+
 #if defined(USE_AURA)
   // Avoid generating too many occlusion tracking calculation events before this
   // function returns. The occlusion status will be computed only once once this
@@ -331,7 +348,8 @@ void ToolbarView::Init() {
   } else {
     location_bar_view = std::make_unique<LocationBarView>(
         browser_, browser_->profile(), browser_->command_controller(), this,
-        display_mode_ != DisplayMode::kNormal);
+        display_mode_ != DisplayMode::kNormal &&
+            !browser_->toolbar_overridden());
   }
 
   // Make sure the toolbar shows by default.
@@ -404,9 +422,11 @@ void ToolbarView::Init() {
 
   std::unique_ptr<MediaToolbarButtonView> media_button;
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-  media_button = std::make_unique<MediaToolbarButtonView>(
-      browser_view_,
-      std::make_unique<MediaToolbarButtonContextualMenu>(browser_));
+  if (BUTTON_VISIBLE(kMedia)) {
+    media_button = std::make_unique<MediaToolbarButtonView>(
+        browser_view_,
+        std::make_unique<MediaToolbarButtonContextualMenu>(browser_));
+  }
 #endif
 
   // Always add children in order from left to right, for accessibility.
@@ -531,7 +551,8 @@ void ToolbarView::Init() {
   // Only show the Battery Saver button when it is not controlled by the OS. On
   // ChromeOS the battery icon in the shelf shows the same information.
   if (!performance_manager::user_tuning::IsBatterySaverModeManagedByOS() &&
-      !features::IsWebUIBatterySaverButtonEnabled()) {
+      !features::IsWebUIBatterySaverButtonEnabled() &&
+      BUTTON_VISIBLE(kBatterySaver)) {
     battery_saver_button_ =
         AddChildView(std::make_unique<BatterySaverButton>(browser_));
   }
@@ -583,7 +604,7 @@ void ToolbarView::Init() {
         AddChildView(std::make_unique<AvatarToolbarButton>(browser_view_));
     bool show_avatar_toolbar_button =
         AvatarToolbarButtonInterface::CanShowForProfile(browser_->profile());
-    avatar_->SetVisible(show_avatar_toolbar_button);
+    avatar_->SetVisible(show_avatar_toolbar_button && BUTTON_VISIBLE(kAvatar));
   }
 
   overflow_button_ = AddChildView(std::make_unique<OverflowButton>());

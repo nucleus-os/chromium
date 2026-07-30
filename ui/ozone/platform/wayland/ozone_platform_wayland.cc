@@ -82,6 +82,8 @@ namespace ui {
 
 namespace {
 
+bool g_multi_threaded_message_loop = false;
+
 constexpr char kDisableAcceleratedSubwindowsForTesting[] =
     "disable-accelerated-subwindows-for-testing";
 
@@ -303,8 +305,16 @@ class OzonePlatformWayland : public OzonePlatform,
 
     supported_formats_ =
         connection_->buffer_manager_host()->GetSupportedSharedImageFormats();
-    linux_ui_delegate_ =
-        std::make_unique<LinuxUiDelegateWayland>(connection_.get());
+    // Not creating the LinuxUiDelegateWayland will disable creation of GtkUi
+    // (interface to GTK desktop features) and cause ui::GetDefaultLinuxUi()
+    // (and related functions) to return nullptr. We can't use GtkUi in
+    // combination with multi-threaded-message-loop because Chromium's GTK
+    // implementation doesn't use GDK threads. Light/dark theme changes will
+    // still be detected via DarkModeManagerLinux.
+    if (!g_multi_threaded_message_loop) {
+      linux_ui_delegate_ =
+          std::make_unique<LinuxUiDelegateWayland>(connection_.get());
+    }
 
     menu_utils_ = std::make_unique<WaylandMenuUtils>(connection_.get());
     wayland_utils_ = std::make_unique<WaylandUtils>(connection_.get());
@@ -569,6 +579,10 @@ class OzonePlatformWayland : public OzonePlatform,
 
 OzonePlatform* CreateOzonePlatformWayland() {
   return new OzonePlatformWayland;
+}
+
+void SetMultiThreadedMessageLoopWayland() {
+  g_multi_threaded_message_loop = true;
 }
 
 }  // namespace ui

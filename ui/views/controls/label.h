@@ -245,6 +245,10 @@ class VIEWS_EXPORT Label : public View,
   void SetDirectionalityMode(gfx::DirectionalityMode mode);
   gfx::DirectionalityMode GetDirectionalityMode() const;
 
+  // Get or set the flags that control display of accelerator characters.
+  void SetDrawStringsFlags(int flags);
+  int GetDrawStringsFlags() const { return draw_strings_flags_; }
+
   // Sets the custom local tooltip text.  Default behavior for a label
   // (single-line) is to show the full text if it is wider than its bounds.
   // Calling this overrides the default behavior and lets you set a custom
@@ -556,6 +560,7 @@ class VIEWS_EXPORT Label : public View,
   int max_width_ = 0;
   // This is used in single-line mode.
   int max_width_single_line_ = 0;
+  int draw_strings_flags_ = 0;
 
   std::unique_ptr<SelectionController> selection_controller_;
 

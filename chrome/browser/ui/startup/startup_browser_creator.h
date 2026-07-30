@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/files/file_path.h"
+#include "base/functional/callback.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/raw_ptr.h"
 #include "build/build_config.h"
@@ -92,6 +93,13 @@ class StartupBrowserCreator {
              const base::FilePath& cur_dir,
              StartupProfileInfo profile_info,
              const Profiles& last_opened_profiles);
+
+  // Registers a callback that will be executed each time
+  // ProcessCommandLineAlreadyRunning is called.
+  using ProcessCommandLineCallback = base::RepeatingCallback<bool(
+      const base::CommandLine& command_line,
+      const base::FilePath& cur_dir)>;
+  static void RegisterProcessCommandLineCallback(ProcessCommandLineCallback cb);
 
   // This function performs command-line handling and is invoked only after
   // start up (for example when we get a start request for another process).

@@ -77,6 +77,7 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) InterfaceEndpointClient
     CHECK(sequence_checker_.CalledOnValidSequence());
     error_handler_ = std::move(error_handler);
     error_with_reason_handler_.Reset();
+    error_with_reason_and_result_handler_.Reset();
   }
 
   void set_connection_error_with_reason_handler(
@@ -84,6 +85,15 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) InterfaceEndpointClient
     CHECK(sequence_checker_.CalledOnValidSequence());
     error_with_reason_handler_ = std::move(error_handler);
     error_handler_.Reset();
+    error_with_reason_and_result_handler_.Reset();
+  }
+
+  void set_connection_error_with_reason_and_result_handler(
+      ConnectionErrorWithReasonAndResultCallback error_handler) {
+    CHECK(sequence_checker_.CalledOnValidSequence());
+    error_with_reason_and_result_handler_ = std::move(error_handler);
+    error_handler_.Reset();
+    error_with_reason_handler_.Reset();
   }
 
   // Returns true if an error was encountered.
@@ -156,7 +166,8 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) InterfaceEndpointClient
 
   // NOTE: |message| must have passed message header validation.
   bool HandleIncomingMessage(Message* message);
-  void NotifyError(const std::optional<DisconnectReason>& reason);
+  void NotifyError(const std::optional<DisconnectReason>& reason,
+                   MojoResult error_result);
 
   // The following methods send interface control messages.
   // They must only be called when the handle is not in pending association
@@ -346,6 +357,8 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) InterfaceEndpointClient
 
   base::OnceClosure error_handler_;
   ConnectionErrorWithReasonCallback error_with_reason_handler_;
+  ConnectionErrorWithReasonAndResultCallback
+      error_with_reason_and_result_handler_;
   bool encountered_error_ = false;
 
   const scoped_refptr<base::SequencedTaskRunner> task_runner_;

@@ -239,8 +239,8 @@ ui::ZOrderLevel Widget::InitParams::EffectiveZOrderLevel() const {
   }
 }
 
-void Widget::InitParams::SetParent(Widget* parent_widget) {
-  SetParent(parent_widget->GetNativeView());
+void Widget::InitParams::SetParent(Widget* parent_widget_arg) {
+  SetParent(parent_widget_arg->GetNativeView());
 }
 
 void Widget::InitParams::SetParent(gfx::NativeView parent_view) {
@@ -501,7 +501,8 @@ void Widget::Init(InitParams params) {
   }
 
   params.child |= (params.type == InitParams::TYPE_CONTROL);
-  is_top_level_ = !params.child;
+  is_top_level_ = !params.child ||
+                  params.parent_widget != gfx::kNullAcceleratedWidget;
   is_autosized_ = params.autosize;
 
   if (params.opacity == views::Widget::InitParams::WindowOpacity::kInferred &&
@@ -602,9 +603,14 @@ void Widget::Init(InitParams params) {
 
     if (show_state == ui::mojom::WindowShowState::kMaximized) {
       Maximize();
+      saved_show_state_ = ui::mojom::WindowShowState::kMaximized;
     } else if (show_state == ui::mojom::WindowShowState::kMinimized) {
       Minimize();
       saved_show_state_ = ui::mojom::WindowShowState::kMinimized;
+    } else if (show_state == ui::mojom::WindowShowState::kFullscreen) {
+      SetFullscreen(true);
+    } else if (show_state == ui::mojom::WindowShowState::kHidden) {
+      Hide();
     }
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -617,7 +623,12 @@ void Widget::Init(InitParams params) {
   } else if (delegate) {
     SetContentsView(delegate->TransferOwnershipOfContentsView());
     if (should_set_initial_bounds) {
-      SetInitialBoundsForFramelessWindow(bounds);
+      if (params.parent_widget != gfx::kNullAcceleratedWidget) {
+        // Set the bounds directly instead of applying an inset.
+        SetBounds(bounds);
+      } else {
+        SetInitialBoundsForFramelessWindow(bounds);
+      }
     }
   }
 
@@ -2052,10 +2063,16 @@ void Widget::OnNativeWidgetParentChanged(gfx::NativeView parent) {
 }
 
 gfx::Size Widget::GetMinimumSize() const {
+  gfx::Size size;
+  if (widget_delegate_->MaybeGetMinimumSize(&size))
+    return size;
   return non_client_view_ ? non_client_view_->GetMinimumSize() : gfx::Size();
 }
 
 gfx::Size Widget::GetMaximumSize() const {
+  gfx::Size size;
+  if (widget_delegate_->MaybeGetMaximumSize(&size))
+    return size;
   return non_client_view_ ? non_client_view_->GetMaximumSize() : gfx::Size();
 }
 
@@ -2361,7 +2378,8 @@ bool Widget::SetInitialFocus(ui::mojom::WindowShowState show_state) {
   View* v = widget_delegate_->GetInitiallyFocusedView();
   if (!focus_on_creation_ ||
       show_state == ui::mojom::WindowShowState::kInactive ||
-      show_state == ui::mojom::WindowShowState::kMinimized) {
+      show_state == ui::mojom::WindowShowState::kMinimized  ||
+      show_state == ui::mojom::WindowShowState::kHidden) {
     // If not focusing the window now, tell the focus manager which view to
     // focus when the window is restored.
     if (v) {

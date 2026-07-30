@@ -75,6 +75,10 @@ RenderViewContextMenuMacCocoa::~RenderViewContextMenuMacCocoa() {
 }
 
 void RenderViewContextMenuMacCocoa::Show() {
+  if (UseShowHandler()) {
+    return;
+  }
+
   views::Widget* widget = views::Widget::GetTopLevelWidgetForNativeView(
       source_web_contents_->GetNativeView());
 
@@ -98,6 +102,10 @@ void RenderViewContextMenuMacCocoa::Show() {
   ui::ShowContextMenu(menu_controller_.menu, clickEvent, parent_view_,
                       /*allow_nested_tasks=*/true,
                       views::ElementTrackerViews::GetContextForWidget(widget));
+}
+
+bool RenderViewContextMenuMacCocoa::IsRunning() {
+  return menu_controller_ && [menu_controller_ isMenuOpen];
 }
 
 void RenderViewContextMenuMacCocoa::CancelToolkitMenu() {

@@ -39,6 +39,7 @@ class ToolkitDelegateViews : public RenderViewContextMenuBase::ToolkitDelegate {
                  const gfx::Point& point,
                  ui::mojom::MenuSourceType type);
   views::MenuItemView* menu_view() { return menu_view_; }
+  bool IsMenuRunning() const;
 
  protected:
   // ToolkitDelegate:

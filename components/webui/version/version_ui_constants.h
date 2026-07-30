@@ -6,6 +6,7 @@
 #define COMPONENTS_WEBUI_VERSION_VERSION_UI_CONSTANTS_H_
 
 #include "build/build_config.h"
+#include "cef/libcef/features/features.h"
 
 namespace version_ui {
 
@@ -95,6 +96,17 @@ extern const char kVersion[];
 extern const char kVersionSuffix[];
 extern const char kVersionModifier[];
 extern const char kVersionProcessorVariation[];
+
+#if BUILDFLAG(ENABLE_CEF)
+extern const char kKeyModulePath[];
+extern const char kKeyUserDataPath[];
+
+extern const char kCefVersion[];
+extern const char kModulePath[];
+extern const char kModulePathName[];
+extern const char kUserDataPath[];
+extern const char kUserDataPathName[];
+#endif
 
 }  // namespace version_ui
 

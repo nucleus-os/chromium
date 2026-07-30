@@ -46,5 +46,13 @@
 
   data: [
     // Entries go here.
+    // Enables cefOptions for Document PiP to specify initial window position
+    {
+      name: "DocumentPictureInPictureCefOptions",
+      status: {
+        "Android": "",
+        "default": "",
+      },
+    },
   ]
 }

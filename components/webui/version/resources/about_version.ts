@@ -72,9 +72,21 @@ function handleVariationInfo(
  * @param profilePath The profile path to display.
  */
 function handlePathInfo(
-    {execPath, profilePath}: {execPath: string, profilePath: string}) {
+    {execPath, profilePath
+// <if expr="enable_cef">
+     , modulePath, userDataPath
+// </if>
+    }: {execPath: string, profilePath: string
+// <if expr="enable_cef">
+        , modulePath: string, userDataPath: string
+// </if>
+    }) {
   getRequiredElement('executable_path').textContent = execPath;
   getRequiredElement('profile_path').textContent = profilePath;
+// <if expr="enable_cef">
+  getRequiredElement('module_path').textContent = modulePath;
+  getRequiredElement('user_data_path').textContent = userDataPath;
+// </if>
 }
 
 // <if expr="is_win">
@@ -184,7 +196,11 @@ function initialize() {
   sendWithPromise<{variationsList: string[], variationsCmd: string}>(
       'requestVariationInfo', includeVariationsCmd)
       .then(handleVariationInfo);
-  sendWithPromise<{execPath: string, profilePath: string}>('requestPathInfo')
+  sendWithPromise<{execPath: string, profilePath: string
+// <if expr="enable_cef">
+      , modulePath: string, userDataPath: string
+// </if>
+      }>('requestPathInfo')
       .then(handlePathInfo);
 
   if (getRequiredElement('variations-source').textContent !== '') {

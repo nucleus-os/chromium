@@ -438,6 +438,8 @@ void Connector::OnSyncHandleWatcherHandleReady(const char* interface_name,
 void Connector::OnHandleReadyInternal(MojoResult result) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
+  handle_ready_result_ = result;
+
   if (result == MOJO_RESULT_FAILED_PRECONDITION) {
     // No more messages on the pipe and the peer is closed.
     HandleError(false /* force_pipe_reset */, false /* force_async_handler */);

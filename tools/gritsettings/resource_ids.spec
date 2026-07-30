@@ -1810,6 +1810,13 @@
   # END "everything else" section.
   # Everything but chrome/, components/, content/, and ios/
 
+  "cef/libcef/resources/cef_resources.grd": {
+    "includes": [12500],
+  },
+  "cef/libcef/resources/cef_strings.grd": {
+    "messages": [12510],
+  }
+
   # Thinking about appending to the end?
   # Please read the header and find the right section above instead.
 }

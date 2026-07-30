@@ -263,6 +263,11 @@ class COMPONENT_EXPORT(UI_BASE) ResourceBundle {
   ResourceBundle(const ResourceBundle&) = delete;
   ResourceBundle& operator=(const ResourceBundle&) = delete;
 
+  // With CEF's multi-threaded mode the ResourceBundle may be created/destroyed
+  // on the main thread but accessed on the UI thread. Call this method on the
+  // UI thread to clean up resources before destruction.
+  void CleanupOnUIThread();
+
   // Loads a secondary locale data pack using the given file region.
   void LoadAdditionalLocaleDataWithPakFileRegion(
       base::File pak_file,

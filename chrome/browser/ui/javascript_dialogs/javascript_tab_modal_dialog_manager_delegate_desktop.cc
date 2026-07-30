@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "cef/libcef/features/features.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -29,6 +30,22 @@
 #if BUILDFLAG(SAFE_BROWSING_AVAILABLE)
 #include "chrome/browser/safe_browsing/user_interaction_observer.h"
 #endif
+
+#if BUILDFLAG(ENABLE_CEF)
+#include "cef/libcef/browser/chrome/extensions/chrome_extension_util.h"
+#endif
+
+namespace {
+
+bool IsAlloyContents(content::WebContents* web_contents) {
+#if BUILDFLAG(ENABLE_CEF)
+  return cef::IsAlloyContents(web_contents, /*primary_only=*/true);
+#else
+  return false;
+#endif
+}
+
+}  // namespace
 
 JavaScriptTabModalDialogManagerDelegateDesktop::
     JavaScriptTabModalDialogManagerDelegateDesktop(
@@ -87,6 +104,9 @@ bool JavaScriptTabModalDialogManagerDelegateDesktop::IsWebContentsForemost() {
   BrowserWindowInterface* browser =
       GetLastActiveBrowserWindowInterfaceWithAnyProfile();
   if (!browser) {
+    if (IsAlloyContents(web_contents_)) {
+      return true;
+    }
     // It's rare, but there are crashes from where sites are trying to show
     // dialogs in the split second of time between when their Browser is gone
     // and they're gone. In that case, bail. https://crbug.com/40727952
@@ -104,6 +124,9 @@ bool JavaScriptTabModalDialogManagerDelegateDesktop::IsWebContentsForemost() {
 }
 
 bool JavaScriptTabModalDialogManagerDelegateDesktop::IsApp() {
+  if (IsAlloyContents(web_contents_)) {
+    return false;
+  }
   tabs::TabInterface* tab =
       tabs::TabInterface::MaybeGetFromContents(web_contents_);
   if (!tab) {
@@ -119,6 +142,9 @@ bool JavaScriptTabModalDialogManagerDelegateDesktop::IsApp() {
 bool JavaScriptTabModalDialogManagerDelegateDesktop::CanShowModalUI() {
   tabs::TabInterface* tab =
       tabs::TabInterface::MaybeGetFromContents(web_contents_);
+  if (!tab && IsAlloyContents(web_contents_)) {
+    return true;
+  }
   return tab && tab->CanShowModalUI();
 }
 

@@ -105,6 +105,12 @@ class Receiver {
     internal_state_.set_connection_error_with_reason_handler(
         std::move(error_handler));
   }
+  void set_disconnect_with_reason_and_result_handler(
+      ConnectionErrorWithReasonAndResultCallback error_handler) {
+    DCHECK(is_bound());
+    internal_state_.set_connection_error_with_reason_and_result_handler(
+        std::move(error_handler));
+  }
 
   // Resets this Receiver to an unbound state. An unbound Receiver will NEVER
   // schedule method calls or disconnection notifications, and any pending tasks

@@ -133,7 +133,7 @@ class NET_EXPORT DirectoryLister  {
   void OnListDone(int error);
 
   scoped_refptr<Core> core_;
-  const raw_ptr<DirectoryListerDelegate> delegate_;
+  raw_ptr<DirectoryListerDelegate> delegate_;
 };
 
 }  // namespace net

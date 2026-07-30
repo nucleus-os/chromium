@@ -140,6 +140,9 @@ namespace contextual_cueing {
 class ContextualCueingController;
 }  // namespace contextual_cueing
 
+namespace content {
+class WebContents;
+}
 namespace contextual_tasks {
 class ContextualTasksBrowserController;
 }  // namespace contextual_tasks
@@ -266,6 +269,8 @@ class BrowserWindowFeatures {
   BrowserWindowFeatures();
   ~BrowserWindowFeatures();
 
+  static bool IsNormalBrowser(const Browser* browser);
+
   BrowserWindowFeatures(const BrowserWindowFeatures&) = delete;
   BrowserWindowFeatures& operator=(const BrowserWindowFeatures&) = delete;
 
@@ -281,6 +286,16 @@ class BrowserWindowFeatures {
   // Called exactly once to initialize features that depend on the view
   // hierarchy in BrowserView.
   void InitPostBrowserViewConstruction(BrowserView* browser_view);
+
+  // Initialize features that depend on the tab model object being created. May
+  // be called multiple times (on TabModel ceation via Navigate). With CEF this
+  // will be called after BrowserView construction.
+  void InitPostTabModelConstruction(BrowserWindowInterface* browser);
+
+  // Called when a WebContents is created as part of TabModel ceation via
+  // Navigate.
+  void OnWebContentsCreated(BrowserWindowInterface* browser,
+                            content::WebContents* target_contents);
 
   // Called exactly once to tear down state that depends on the window object.
   void TearDownPreBrowserWindowDestruction();

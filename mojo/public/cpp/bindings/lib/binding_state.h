@@ -66,6 +66,13 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) BindingStateBase {
         std::move(error_handler));
   }
 
+  void set_connection_error_with_reason_and_result_handler(
+      ConnectionErrorWithReasonAndResultCallback error_handler) {
+    DCHECK(is_bound());
+    endpoint_client_->set_connection_error_with_reason_and_result_handler(
+        std::move(error_handler));
+  }
+
   bool is_bound() const { return !!router_; }
 
   MessagePipeHandle handle() const {

@@ -190,9 +190,20 @@ void NativeWebContentsModalDialogManagerViews::HostChanged(
   if (host_) {
     host_->AddObserver(this);
 
-    for (views::Widget* widget : observed_widgets_) {
-      views::Widget::ReparentNativeView(widget->GetNativeView(),
-                                        host_->GetHostView());
+    // |host_view| will be nullptr with CEF windowless rendering.
+    if (auto host_view = host_->GetHostView()) {
+      for (views::Widget* widget : observed_widgets_) {
+#if defined(USE_AURA)
+        auto widget_view = widget->GetNativeView();
+        // Don't reparent between different root windows. Doing so causes
+        // issues with layout of dialogs containing Chrome browsers.
+        if (host_view->GetRootWindow() == widget_view->GetRootWindow()) {
+          views::Widget::ReparentNativeView(widget_view, host_view);
+        }
+#else
+        views::Widget::ReparentNativeView(widget->GetNativeView(), host_view);
+#endif
+      }
     }
 
     OnPositionRequiresUpdate();

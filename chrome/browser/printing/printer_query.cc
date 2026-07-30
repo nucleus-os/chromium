@@ -125,6 +125,7 @@ PrinterQuery::PrinterQuery(content::GlobalRenderFrameHostId rfh_id)
       rfh_id_(rfh_id),
       cookie_(PrintSettings::NewCookie()) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  printing_context_->set_render_ids(rfh_id.child_id, rfh_id.frame_routing_id);
 }
 
 PrinterQuery::~PrinterQuery() {

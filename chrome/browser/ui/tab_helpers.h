@@ -6,6 +6,7 @@
 #define CHROME_BROWSER_UI_TAB_HELPERS_H_
 
 #include "build/build_config.h"
+#include "cef/libcef/features/features.h"
 
 #if BUILDFLAG(IS_ANDROID)
 
@@ -40,6 +41,10 @@ class ChromeNoStatePrefetchContentsDelegate;
 namespace tabs {
 class TabModel;
 }  // namespace tabs
+
+#if BUILDFLAG(ENABLE_CEF)
+class CefBrowserPlatformDelegateAlloy;
+#endif
 
 // A "tab contents" is a WebContents that is used as a tab in a browser window
 // (or the equivalent on Android). The TabHelpers class allows specific classes
@@ -79,6 +84,10 @@ class TabHelpers {
 
   // Link Preview shows a preview of a page, then promote it as a new tab.
   friend class PreviewTab;
+
+#if BUILDFLAG(ENABLE_CEF)
+  friend class CefBrowserPlatformDelegateAlloy;
+#endif
 
   // FYI: Do NOT add any more friends here. The functions above are the ONLY
   // ones that need to call AttachTabHelpers; if you think you do, re-read the

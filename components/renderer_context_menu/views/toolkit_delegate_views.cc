@@ -31,6 +31,10 @@ void ToolkitDelegateViews::RunMenuAt(views::Widget* parent,
                           anchor_position, type);
 }
 
+bool ToolkitDelegateViews::IsMenuRunning() const {
+  return menu_runner_ && menu_runner_->IsRunning();
+}
+
 void ToolkitDelegateViews::Init(ui::SimpleMenuModel* menu_model) {
   menu_adapter_ = std::make_unique<views::MenuModelAdapter>(menu_model);
   std::unique_ptr<views::MenuItemView> menu_view = menu_adapter_->CreateMenu();

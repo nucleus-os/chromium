@@ -90,8 +90,10 @@ void SelectFileDialog::SetFactory(
 // static
 scoped_refptr<SelectFileDialog> SelectFileDialog::Create(
     Listener* listener,
-    std::unique_ptr<ui::SelectFilePolicy> policy) {
-  if (dialog_factory_)
+    std::unique_ptr<ui::SelectFilePolicy> policy,
+    bool run_from_cef) {
+  // Avoid reentrancy of the CEF factory.
+  if (dialog_factory_ && (!run_from_cef || !dialog_factory_->IsCefFactory()))
     return dialog_factory_->Create(listener, std::move(policy));
   return CreateSelectFileDialog(listener, std::move(policy));
 }

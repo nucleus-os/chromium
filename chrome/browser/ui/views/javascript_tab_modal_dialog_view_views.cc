@@ -49,9 +49,13 @@ views::View* JavaScriptTabModalDialogViewViews::GetInitiallyFocusedView() {
 }
 
 void JavaScriptTabModalDialogViewViews::AddedToWidget() {
-  auto* bubble_frame_view = static_cast<views::BubbleFrameView*>(
-      GetWidget()->non_client_view()->frame_view());
-  bubble_frame_view->SetTitleView(CreateTitleOriginLabel(GetWindowTitle()));
+  auto* frame_view = GetWidget()->non_client_view()->frame_view();
+  // With CEF OSR this may be a NativeFrameView, in which case HasWindowTitle()
+  // will return false.
+  if (frame_view->HasWindowTitle()) {
+    auto* bubble_frame_view = static_cast<views::BubbleFrameView*>(frame_view);
+    bubble_frame_view->SetTitleView(CreateTitleOriginLabel(GetWindowTitle()));
+  }
   if (!message_text_.empty()) {
     GetWidget()->GetRootView()->GetViewAccessibility().SetDescription(
         message_text_);
@@ -79,10 +83,13 @@ JavaScriptTabModalDialogViewViews::JavaScriptTabModalDialogViewViews(
       default_prompt_text_(default_prompt_text),
       dialog_callback_(std::move(dialog_callback)),
       dialog_force_closed_callback_(std::move(dialog_force_closed_callback)) {
+  // Will be nullptr with CEF Alloy style browsers.
   tabs::TabInterface* tab =
-      tabs::TabInterface::GetFromContents(parent_web_contents);
-  CHECK(tab && tab->CanShowModalUI());
-  scoped_tab_modal_ui_ = tab->ShowModalUI();
+      tabs::TabInterface::MaybeGetFromContents(parent_web_contents);
+  if (tab) {
+    CHECK(tab->CanShowModalUI());
+    scoped_tab_modal_ui_ = tab->ShowModalUI();
+  }
 
   SetModalType(ui::mojom::ModalType::kChild);
   SetDefaultButton(static_cast<int>(ui::mojom::DialogButton::kOk));

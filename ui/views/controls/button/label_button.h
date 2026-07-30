@@ -186,6 +186,9 @@ class VIEWS_EXPORT LabelButton : public Button,
     return !!paint_as_active_subscription_;
   }
 
+  // Sets the font list used by this button.
+  void SetFontList(const gfx::FontList& font_list);
+
  protected:
   LabelButtonImageContainer* image_container() {
     return image_container_.get();

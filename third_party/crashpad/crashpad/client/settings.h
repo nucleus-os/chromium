@@ -196,6 +196,11 @@ class Settings final : public SettingsReader {
                             time_t lockfile_ttl);
 #endif  // !CRASHPAD_FLOCK_ALWAYS_SUPPORTED
 
+  bool GetNextUploadAttemptTime(time_t* time);
+  bool SetNextUploadAttemptTime(time_t time);
+  bool GetBackoffStep(int* step);
+  bool SetBackoffStep(int step);
+
  private:
   // This must be constructed with MakeScopedLockedFileHandle(). It both unlocks
   // and closes the file on destruction. Note that on Fuchsia, this handle DOES

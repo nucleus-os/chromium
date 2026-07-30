@@ -50,6 +50,7 @@ class MenuRunnerImplInterface {
       ui::mojom::MenuSourceType source_type,
       int32_t run_types,
       gfx::NativeView native_view_for_gestures,
+      gfx::AcceleratedWidget parent_widget,
       std::optional<gfx::RoundedCornersF> corners,
       std::optional<std::string> show_menu_host_duration_histogram) = 0;
   void RunMenuAt(
@@ -60,9 +61,11 @@ class MenuRunnerImplInterface {
       ui::mojom::MenuSourceType source_type = ui::mojom::MenuSourceType::kNone,
       int32_t run_types = MenuRunner::NO_FLAGS,
       gfx::NativeView native_view_for_gestures = {},
+      gfx::AcceleratedWidget parent_widget =
+          gfx::kNullAcceleratedWidget,
       std::optional<gfx::RoundedCornersF> corners = std::nullopt) {
     RunMenuAt(parent, button_controller, bounds, anchor, source_type, run_types,
-              native_view_for_gestures, corners, std::nullopt);
+              native_view_for_gestures, parent_widget, corners, std::nullopt);
   }
 
   // Hides and cancels the menu.

@@ -57,10 +57,27 @@ enum LabelPropertyKey {
   kLabelObscured,
   kLabelAllowCharacterBreak,
   kAccessibleTextOffsets,
+  kLabelDrawStringsFlags,
 };
 
 bool IsOpaque(SkColor color) {
   return SkColorGetA(color) == SK_AlphaOPAQUE;
+}
+
+// Strips accelerator character prefixes in |text| if needed, based on |flags|.
+// Returns a range in |text| to underline or Range::InvalidRange() if
+// underlining is not needed.
+gfx::Range StripAcceleratorChars(int flags, std::u16string* text) {
+  if (flags & (gfx::Canvas::SHOW_PREFIX | gfx::Canvas::HIDE_PREFIX)) {
+    int char_pos = -1;
+    int char_span = 0;
+    *text = gfx::LocateAndRemoveAcceleratorChar(*text, &char_pos, &char_span);
+    if ((flags & gfx::Canvas::SHOW_PREFIX) && char_pos != -1) {
+      return gfx::Range(static_cast<size_t>(char_pos),
+                        static_cast<size_t>(char_pos + char_span));
+    }
+  }
+  return gfx::Range::InvalidRange();
 }
 
 }  // namespace
@@ -544,6 +561,15 @@ gfx::DirectionalityMode Label::GetDirectionalityMode() const {
   return full_text_->directionality_mode();
 }
 
+void Label::SetDrawStringsFlags(int flags) {
+  if (draw_strings_flags_ == flags)
+    return;
+  draw_strings_flags_ = flags;
+  full_text_->SetDrawStringsFlags(draw_strings_flags_);
+  OnPropertyChanged(&full_text_ + kLabelDrawStringsFlags,
+                    PropertyEffects::kPreferredSizeChanged);
+}
+
 void Label::SetCustomTooltipText(std::u16string_view tooltip_text) {
   custom_tooltip_text_ = std::u16string(tooltip_text);
 
@@ -885,6 +911,16 @@ std::unique_ptr<gfx::RenderText> Label::CreateRenderText() const {
     render_text->set_focused(HasFocus());
     if (stored_selection_range_.IsValid()) {
       render_text->SelectRange(stored_selection_range_);
+    }
+  }
+
+  if (draw_strings_flags_ != 0) {
+    std::u16string text_str(GetText());
+    gfx::Range range = StripAcceleratorChars(draw_strings_flags_, &text_str);
+    render_text->SetText(text_str);
+    if (range.IsValid()) {
+      render_text->SetDisplayRect(bounds());
+      render_text->ApplyStyle(gfx::TEXT_STYLE_UNDERLINE, true, range);
     }
   }
 

@@ -93,6 +93,14 @@ void PageActionIconController::Init(const PageActionIconParams& params,
     if (IsPageActionMigrated(type)) {
       continue;
     }
+
+#if BUILDFLAG(ENABLE_CEF)
+    if (params.browser && params.browser->cef_delegate() &&
+        !params.browser->cef_delegate()->IsPageActionIconVisible(type)) {
+      continue;
+    }
+#endif
+
     switch (type) {
       case PageActionIconType::kBookmarkStar:
         add_page_action_icon(type, std::make_unique<StarView>(

@@ -68,6 +68,8 @@ class BrowserPluginGuest : public WebContentsObserver {
   WebContentsImpl* GetWebContents() const;
   RenderFrameHostImpl* GetProspectiveOuterDocument();
 
+  WebContentsImpl* owner_web_contents() const { return owner_web_contents_; }
+
  private:
   // BrowserPluginGuest is a WebContentsObserver of |web_contents| and
   // |web_contents| has to stay valid for the lifetime of BrowserPluginGuest.
@@ -78,6 +80,8 @@ class BrowserPluginGuest : public WebContentsObserver {
 
   // May be null during guest destruction.
   const base::WeakPtr<BrowserPluginGuestDelegate> delegate_;
+
+  raw_ptr<WebContentsImpl> owner_web_contents_ = nullptr;
 };
 
 }  // namespace content

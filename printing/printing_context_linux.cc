@@ -88,8 +88,8 @@ mojom::ResultCode PrintingContextLinux::UseDefaultSettings() {
 }
 
 gfx::Size PrintingContextLinux::GetPdfPaperSizeDeviceUnits() {
-  if (ui::LinuxUi::instance()) {
-    return ui::LinuxUi::instance()->GetPdfPaperSize(this);
+  if (ui::PrintingContextLinuxDelegate::instance()) {
+    return ui::PrintingContextLinuxDelegate::instance()->GetPdfPaperSize(this);
   }
 
   return gfx::Size();

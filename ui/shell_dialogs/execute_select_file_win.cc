@@ -33,7 +33,7 @@ namespace ui {
 namespace {
 
 // Stop switch for the AutoCloseDialogEventHandler.
-BASE_FEATURE(kAutoCloseFileDialogs, base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kAutoCloseFileDialogs, base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Stop switch for the `SafeAcceptFileDialogEventHandler`.
 BASE_FEATURE(kSafeAcceptFileDialogs, base::FEATURE_ENABLED_BY_DEFAULT);

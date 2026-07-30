@@ -27,6 +27,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/observer_list.h"
 #include "base/scoped_observation.h"
+#include "base/supports_user_data.h"
 #include "base/types/pass_key.h"
 #include "build/build_config.h"
 #include "third_party/skia/include/core/SkPath.h"
@@ -298,7 +299,8 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
                           public ui::EventTarget,
                           public ui::EventHandler,
                           public ui::PropertyHandler,
-                          public ui::metadata::MetaDataProvider {
+                          public ui::metadata::MetaDataProvider,
+                          public base::SupportsUserData {
   // Do not remove this macro!
   // The macro is maintained by the memory safety team.
   ADVANCED_MEMORY_SAFETY_CHECKS();
@@ -647,7 +649,7 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
 
   // Return the preferred height for a specific width. It is a helper function
   // of GetPreferredSize(SizeBounds(w, SizeBound())).height().
-  int GetHeightForWidth(int w) const;
+  virtual int GetHeightForWidth(int w) const;
 
   // Returns a bound on the available space for a child view, for example, in
   // case the child view wants to play an animation that would cause it to

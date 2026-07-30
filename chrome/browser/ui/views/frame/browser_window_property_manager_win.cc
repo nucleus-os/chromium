@@ -8,6 +8,7 @@
 #include "base/functional/bind.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/win/windows_version.h"
+#include "cef/libcef/features/features.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
@@ -48,6 +49,16 @@ BrowserWindowPropertyManager::~BrowserWindowPropertyManager() {
 void BrowserWindowPropertyManager::UpdateWindowProperties() {
   const Browser* browser = view_->browser();
   Profile* profile = browser->profile();
+
+#if BUILDFLAG(ENABLE_CEF)
+  if (browser->cef_delegate() &&
+        (browser->is_type_picture_in_picture() ||
+         browser->is_type_devtools()) &&
+        browser->cef_delegate()->HasViewsHostedOpener()) {
+    // Don't create a separate taskbar group.
+    return;
+  }
+#endif
 
   // Set the app user model id for this application to that of the application
   // name. See http://crbug.com/41308099.

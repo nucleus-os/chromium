@@ -26,11 +26,30 @@
 #include "extensions/renderer/guest_view/mime_handler_view/post_message_support.h"
 #endif  // BUILDFLAG(ENABLE_PDF)
 
-ChromePrintRenderFrameHelperDelegate::ChromePrintRenderFrameHelperDelegate() =
-    default;
+namespace {
+
+std::optional<bool> g_next_print_preview_enabled;
+
+} // namespace
+
+ChromePrintRenderFrameHelperDelegate::ChromePrintRenderFrameHelperDelegate(
+    std::optional<bool> print_preview_enabled)
+    : print_preview_enabled_(print_preview_enabled.has_value()
+                                 ? print_preview_enabled
+                                 : g_next_print_preview_enabled) {
+  if (g_next_print_preview_enabled.has_value()) {
+    g_next_print_preview_enabled = std::nullopt;
+  }
+}
 
 ChromePrintRenderFrameHelperDelegate::~ChromePrintRenderFrameHelperDelegate() =
     default;
+
+// static
+void ChromePrintRenderFrameHelperDelegate::SetNextPrintPreviewEnabled(
+    std::optional<bool> enabled) {
+  g_next_print_preview_enabled = enabled;
+}
 
 // Returns the PDF object element if the parent of `frame` is the PDF extension
 // frame.
@@ -56,6 +75,10 @@ blink::WebElement ChromePrintRenderFrameHelperDelegate::GetPdfElement(
 }
 
 bool ChromePrintRenderFrameHelperDelegate::IsPrintPreviewEnabled() {
+  if (print_preview_enabled_.has_value()) {
+    return *print_preview_enabled_;
+  }
+
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   return !command_line->HasSwitch(switches::kDisablePrintPreview);
 }

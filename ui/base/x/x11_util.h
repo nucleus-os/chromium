@@ -246,8 +246,9 @@ x11::Future<void> SendClientMessage(
     x11::Window target,
     x11::Atom type,
     const std::array<uint32_t, 5> data,
-    x11::EventMask event_mask = x11::EventMask::SubstructureNotify |
-                                x11::EventMask::SubstructureRedirect);
+    x11::EventMask event_mask = static_cast<x11::EventMask>(
+        static_cast<int>(x11::EventMask::SubstructureNotify) |
+        static_cast<int>(x11::EventMask::SubstructureRedirect)));
 
 // Return true if VulkanSurface is supported.
 COMPONENT_EXPORT(UI_BASE_X) bool IsVulkanSurfaceSupported();

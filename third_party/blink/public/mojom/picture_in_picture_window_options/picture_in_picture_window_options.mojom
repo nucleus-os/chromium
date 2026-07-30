@@ -4,6 +4,8 @@
 
 module blink.mojom;
 
+import "ui/gfx/geometry/mojom/geometry.mojom";
+
 struct PictureInPictureWindowOptions {
   // The requested width for the picture-in-picture window to be initially sized
   // to.
@@ -21,4 +23,8 @@ struct PictureInPictureWindowOptions {
   // When true, don't try to re-use the previous window bounds from the
   // bounds cache.  Instead, just use the default position and size.
   bool prefer_initial_window_placement;
+
+  // CEF extension
+  gfx.mojom.Point? initial_position;
+  bool resizable = true;
 };

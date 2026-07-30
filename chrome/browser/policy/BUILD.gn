@@ -27,6 +27,7 @@ source_set("path_parser") {
     "//base",
     "//chrome/common:constants",
     "//components/policy:generated",
+    "//components/strings:components_strings",
   ]
 
   if (is_mac) {

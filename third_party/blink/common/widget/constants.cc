@@ -6,7 +6,9 @@
 
 namespace blink {
 
-const int kMinimumWindowSize = 100;
+// Allow JavaScript resize down to kMinWindowSize which applies for Document
+// Picture-in-Picture windows.
+const int kMinimumWindowSize = 52;
 
 // TODO(b/307160156, b/307182741); Investigate where else is the window size
 // limited to be able to drop this even more until 9 instead 29.

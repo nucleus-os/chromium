@@ -22,6 +22,10 @@
 #include "components/policy/core/browser/android/policy_cache_updater_android.h"
 #endif
 
+#if BUILDFLAG(IS_MAC)
+#include "base/apple/scoped_cftyperef.h"
+#endif
+
 class PrefService;
 
 namespace policy {
@@ -126,6 +130,25 @@ class ChromeBrowserPolicyConnector : public BrowserPolicyConnector {
   bool IsCommandLineSwitchSupported() const override;
 
   static void EnableCommandLineSupportForTesting();
+
+  // Enable platform policy support with the specified retrieval |id|. Support
+  // is disabled by default, and if |id| is empty.
+  // On Windows, this is a registry key like "SOFTWARE\\Policies\\Google\\Chrome".
+  // On MacOS, this is a bundle ID like "com.google.Chrome".
+  // On Linux, this is a directory path like "/etc/opt/chrome/policies".
+  static void EnablePlatformPolicySupport(const std::string& id);
+
+  // Platform-specific retrieval of the policy ID value.
+#if BUILDFLAG(IS_WIN)
+  // Replaces all direct usage of kRegistryChromePolicyKey.
+  static std::wstring GetPolicyKey();
+#elif BUILDFLAG(IS_MAC)
+  // Replaces all direct usage of CFSTR("com.google.Chrome").
+  static base::apple::ScopedCFTypeRef<CFStringRef> GetBundleId();
+#elif BUILDFLAG(IS_POSIX) && !BUILDFLAG(IS_ANDROID)
+  // Replaces all direct usage of chrome::DIR_POLICY_FILES.
+  static bool GetDirPolicyFilesPath(base::FilePath* path);
+#endif
 
   virtual base::flat_set<std::string> device_affiliation_ids() const;
   void SetDeviceAffiliatedIdsForTesting(

@@ -70,6 +70,8 @@ NativeWidgetType GetNativeWidgetTypeForInitParams(
   }
 
   return (params.parent &&
+          (params.child ||
+           params.type == views::Widget::InitParams::TYPE_BUBBLE) &&
           params.type != views::Widget::InitParams::TYPE_MENU &&
           params.type != views::Widget::InitParams::TYPE_TOOLTIP)
              ? NativeWidgetType::kNativeWidgetAura

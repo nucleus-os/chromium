@@ -103,6 +103,7 @@ constexpr char kPrimaryOTRProfileID[] = "profile::primary_otr";
 // differentiated by such prefixes. Consult with the profile owners before
 // proceeding if you believe a new prefix is strictly necessary.
 // See `chrome/browser/PRESUBMIT.py` which enforces this via a warning.
+constexpr char kCEFOTRProfileIDPrefix[] = "CEF::BrowserContext";
 constexpr char kDevToolsOTRProfileIDPrefix[] = "Devtools::BrowserContext";
 constexpr char kMediaRouterOTRProfileIDPrefix[] = "MediaRouter::Presentation";
 constexpr char kTestOTRProfileIDPrefix[] = "Test::OTR";
@@ -123,6 +124,8 @@ bool Profile::OTRProfileID::AllowsBrowserWindows() const {
   // DevTools::BrowserContext, MediaRouter::Presentation, and
   // CaptivePortal::Signin are exceptions to this ban.
   if (*this == PrimaryID() || IsDevTools() ||
+      base::StartsWith(profile_id_, kCEFOTRProfileIDPrefix,
+                       base::CompareCase::SENSITIVE) ||
       base::StartsWith(profile_id_, kMediaRouterOTRProfileIDPrefix,
                        base::CompareCase::SENSITIVE)) {
     return true;
@@ -161,6 +164,16 @@ Profile::OTRProfileID Profile::OTRProfileID::CreateUnique(
   return OTRProfileID(base::StringPrintf(
       "%s-%s", profile_id_prefix.c_str(),
       base::Uuid::GenerateRandomV4().AsLowercaseString().c_str()));
+}
+
+// static
+Profile::OTRProfileID Profile::OTRProfileID::CreateUniqueForCEF() {
+  return CreateUnique(kCEFOTRProfileIDPrefix);
+}
+
+bool Profile::OTRProfileID::IsUniqueForCEF() const {
+  return base::StartsWith(profile_id_, kCEFOTRProfileIDPrefix,
+                          base::CompareCase::SENSITIVE);
 }
 
 // static

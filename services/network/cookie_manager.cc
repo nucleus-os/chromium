@@ -346,13 +346,13 @@ void CookieManager::AllowFileSchemeCookies(
     AllowFileSchemeCookiesCallback callback) {
   OnSettingsWillChange();
 
-  std::vector<std::string> cookieable_schemes =
-      net::CookieMonster::GetDefaultCookieableSchemes();
   if (allow) {
-    cookieable_schemes.emplace_back(url::kFileScheme);
+    cookie_store_->AddCookieableSchemes({url::kFileScheme},
+                                        std::move(callback));
+  } else {
+    cookie_store_->RemoveCookieableSchemes({url::kFileScheme},
+                                           std::move(callback));
   }
-  cookie_store_->SetCookieableSchemes(std::move(cookieable_schemes),
-                                      std::move(callback));
 }
 
 void CookieManager::SetForceKeepSessionState() {

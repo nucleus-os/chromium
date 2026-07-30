@@ -21,7 +21,9 @@ bool IsBookmarkBarLocation(BookmarkLaunchLocation location) {
 
 auto GetMetricProfile(const Profile* profile) {
   DCHECK(profile);
-  DCHECK(profile->IsRegularProfile() || profile->IsIncognitoProfile());
+  DCHECK(profile->IsRegularProfile() || profile->IsIncognitoProfile() ||
+         (profile->IsOffTheRecord() &&
+          profile->GetOTRProfileID().IsUniqueForCEF()));
   return profile->IsRegularProfile()
              ? profile_metrics::BrowserProfileType::kRegular
              : profile_metrics::BrowserProfileType::kIncognito;

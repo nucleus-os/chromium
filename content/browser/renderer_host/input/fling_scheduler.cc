@@ -98,6 +98,9 @@ void FlingScheduler::ProgressFlingOnBeginFrameIfneeded(
 }
 
 ui::Compositor* FlingScheduler::GetCompositor() {
+  if (compositor_) {
+    return compositor_;
+  }
   if (!host_->GetView()) {
     return nullptr;
   }

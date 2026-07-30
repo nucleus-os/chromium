@@ -21,11 +21,29 @@ namespace ui {
 namespace {
 
 LinuxUi* g_linux_ui = nullptr;
+static PrintingContextLinuxDelegate* g_delegate = nullptr;
 
 }  // namespace
 
 // static
+PrintingContextLinuxDelegate* PrintingContextLinuxDelegate::SetInstance(
+    PrintingContextLinuxDelegate* delegate) {
+  auto old_delegate = g_delegate;
+  g_delegate = delegate;
+  return old_delegate;
+}
+
+// static
+PrintingContextLinuxDelegate* PrintingContextLinuxDelegate::instance() {
+  return g_delegate;
+}
+
+// static
 LinuxUi* LinuxUi::SetInstance(LinuxUi* instance) {
+#if BUILDFLAG(IS_LINUX) && BUILDFLAG(ENABLE_PRINTING)
+  PrintingContextLinuxDelegate::SetInstance(instance);
+#endif
+
   return std::exchange(g_linux_ui, instance);
 }
 

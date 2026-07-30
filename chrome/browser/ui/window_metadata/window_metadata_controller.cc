@@ -63,8 +63,12 @@ WindowMetadataController::WindowMetadataController(
 WindowMetadataController::~WindowMetadataController() = default;
 
 gfx::Image WindowMetadataController::GetCurrentPageIcon() const {
+  // For document picture-in-picture windows, we use the favicon from the opener
+  // WebContents instead of the picture-in-picture WebContents itself.
   content::WebContents* web_contents =
-      browser_->tab_strip_model()->GetActiveWebContents();
+      browser_->is_type_picture_in_picture()
+          ? PictureInPictureWindowManager::GetInstance()->GetWebContents()
+          : browser_->tab_strip_model()->GetActiveWebContents();
   // |web_contents| can be NULL since GetCurrentPageIcon() is called by the
   // window during the window's creation (before tabs have been added).
   favicon::FaviconDriver* favicon_driver =

@@ -9,6 +9,7 @@
 
 #include "base/memory/weak_ptr.h"
 #include "base/values.h"
+#include "cef/libcef/features/features.h"
 #include "content/public/browser/web_ui_message_handler.h"
 
 // Handler class for Version page operations.
@@ -44,7 +45,12 @@ class VersionHandler : public content::WebUIMessageHandler {
   // front end.
   void OnGotFilePaths(std::string callback_id,
                       std::u16string* executable_path_data,
-                      std::u16string* profile_path_data);
+                      std::u16string* profile_path_data
+#if BUILDFLAG(ENABLE_CEF)
+                      , std::u16string* module_path_data,
+                      std::u16string* user_data_path_data
+#endif
+                      );
 
   // Factory for the creating refs in callbacks.
   base::WeakPtrFactory<VersionHandler> weak_ptr_factory_{this};

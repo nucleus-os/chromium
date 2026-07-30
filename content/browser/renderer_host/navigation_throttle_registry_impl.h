@@ -136,7 +136,8 @@ class CONTENT_EXPORT NavigationThrottleRegistryImpl
   // Implements NavigationThrottleRegistry:
   NavigationHandle& GetNavigationHandle() override;
   void AddThrottle(
-      std::unique_ptr<NavigationThrottle> navigation_throttle) override;
+      std::unique_ptr<NavigationThrottle> navigation_throttle,
+      bool first = false) override;
   bool HasThrottle(const std::string& name) override;
   bool EraseThrottleForTesting(const std::string& name) override;
 

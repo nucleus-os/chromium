@@ -35,6 +35,7 @@
 #include "base/version.h"
 #include "build/build_config.h"
 #include "build/config/compiler/compiler_buildflags.h"
+#include "cef/libcef/features/features.h"
 #include "chrome/browser/about_flags.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/buildflags.h"
@@ -933,9 +934,11 @@ void RecordStartupMetrics() {
   key_credential_manager_support::ReportKeyCredentialManagerSupport();
 #endif  // BUILDFLAG(IS_WIN)
 
+#if !BUILDFLAG(ENABLE_CEF)
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
   crypto::MaybeMeasureTpmOperations(unexportable_keys::GetDefaultConfig());
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
+#endif  // !BUILDFLAG(ENABLE_CEF)
 
   // Record whether Chrome is the default browser or not.
   // Disabled on Linux due to hanging browser tests, see crbug.com/40770414.

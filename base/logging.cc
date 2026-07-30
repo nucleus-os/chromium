@@ -428,7 +428,30 @@ void WriteToFd(int fd, const char* data, size_t length) {
   }
 }
 
+#if BUILDFLAG(IS_WIN)
+using SetLogFatalCrashKeyFunc = void (*)(const char* /*file*/,
+                                         int /*line*/,
+                                         const char* /*message*/);
+
+SetLogFatalCrashKeyFunc SetLogFatalCrashKeyFuncGetter() {
+  static SetLogFatalCrashKeyFunc log_fatal_crash_key_func = []() {
+    // Function exported by bootstrap.exe.
+    return reinterpret_cast<SetLogFatalCrashKeyFunc>(
+        GetProcAddress(GetModuleHandle(NULL), "SetLogFatalCrashKey"));
+  }();
+  return log_fatal_crash_key_func;
+}
+#endif  // BUILDFLAG(IS_WIN)
+
 void SetLogFatalCrashKey(LogMessage* log_message) {
+#if BUILDFLAG(IS_WIN)
+  if (auto func = SetLogFatalCrashKeyFuncGetter()) {
+    func(log_message->file(), log_message->line(),
+         log_message->str().c_str() + log_message->message_start());
+    return;
+  }
+#endif
+
   // In case of an out-of-memory condition, this code could be reentered when
   // constructing and storing the key. Using a static is not thread-safe, but if
   // multiple threads are in the process of a fatal crash at the same time, this
@@ -496,6 +519,11 @@ std::ostream* g_swallow_stream;
 bool BaseInitLoggingImpl(const LoggingSettings& settings) {
 #if BUILDFLAG(IS_CHROMEOS)
   g_log_format = settings.log_format;
+#endif
+
+#if BUILDFLAG(IS_WIN)
+  // Preload the function pointer so that we do minimal work while crashing.
+  SetLogFatalCrashKeyFuncGetter();
 #endif
 
   MaybeInitializeVlogInfo();

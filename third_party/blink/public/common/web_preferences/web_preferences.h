@@ -428,6 +428,9 @@ struct BLINK_COMMON_EXPORT WebPreferences {
   // forcing :focus-visible to match regardless of focus method).
   bool always_show_focus = false;
 
+  // Whether CDP accessibility tree serialization collapses off-screen nodes.
+  bool accessibility_viewport_collapse = false;
+
   // Whether touch input can trigger HTML drag-and-drop operations. The
   // default value depends on the platform.
   bool touch_drag_drop_enabled = false;

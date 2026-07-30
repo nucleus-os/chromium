@@ -267,6 +267,7 @@ static_library("generated") {
     ":cloud_policy_proto_generated_compile",
     ":policy_code_generate",
     "//base",
+    "//cef/libcef/features:buildflags",
     "//components/policy/core/common:common_constants",
     "//components/policy/proto:policy_common_definitions_compile_proto",
     "//third_party/protobuf:protobuf_lite",

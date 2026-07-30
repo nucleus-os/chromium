@@ -962,6 +962,17 @@ ResultCode SandboxWin::StartSandboxedProcess(
     const base::HandlesToInheritVector& handles_to_inherit,
     SandboxDelegate* delegate,
     StartSandboxedProcessCallback result_callback) {
+  // Will be nullptr if SandboxInterfaceInfo was not initialized by the CEF
+  // client, meaning that the sandbox is implicitly disabled.
+  if (!g_broker_services) {
+    base::Process process;
+    ResultCode result =
+        LaunchWithoutSandbox(cmd_line, handles_to_inherit, delegate, &process);
+    DWORD last_error = GetLastError();
+    std::move(result_callback).Run(std::move(process), last_error, result);
+    return SBOX_ALL_OK;
+  }
+
   SandboxLaunchTimer timer;
 
   // Avoid making a policy if we won't use it.
@@ -1036,10 +1047,16 @@ void SandboxWin::FinishStartSandboxedProcess(
 // static
 ResultCode SandboxWin::GetPolicyDiagnostics(
     base::OnceCallback<void(base::Value)> response) {
-  CHECK(g_broker_services);
   CHECK(!response.is_null());
   auto receiver = std::make_unique<ServiceManagerDiagnosticsReceiver>(
       base::SequencedTaskRunner::GetCurrentDefault(), std::move(response));
+  // Will be nullptr if SandboxInterfaceInfo was not initialized by the CEF
+  // client, meaning that the sandbox is implicitly disabled. Match the
+  // failure behavior in BrokerServicesBase::GetPolicyDiagnostics.
+  if (!g_broker_services) {
+    receiver->OnError(SBOX_ERROR_GENERIC);
+    return SBOX_ERROR_GENERIC;
+  }
   return g_broker_services->GetPolicyDiagnostics(std::move(receiver));
 }
 

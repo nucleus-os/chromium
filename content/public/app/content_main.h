@@ -66,6 +66,11 @@ struct CONTENT_EXPORT ContentMainParams {
   // are left uninitialized.
   bool minimal_browser_mode = false;
 
+#if BUILDFLAG(IS_POSIX) && !BUILDFLAG(IS_ANDROID)
+  // Indicates whether to disable signal handlers
+  bool disable_signal_handlers = false;
+#endif
+
 #if BUILDFLAG(IS_MAC)
   // The outermost autorelease pool to pass to main entry points.
   STACK_ALLOCATED_IGNORE("https://crbug.com/1424190")
@@ -93,6 +98,13 @@ struct CONTENT_EXPORT ContentMainParams {
     return copy;
   }
 };
+
+// Split RunContentProcess() into separate stages.
+CONTENT_EXPORT int ContentMainInitialize(
+    ContentMainParams params,
+    ContentMainRunner* content_main_runner);
+CONTENT_EXPORT int ContentMainRun(ContentMainRunner* content_main_runner);
+CONTENT_EXPORT void ContentMainShutdown(ContentMainRunner* content_main_runner);
 
 CONTENT_EXPORT int RunContentProcess(ContentMainParams params,
                                      ContentMainRunner* content_main_runner);

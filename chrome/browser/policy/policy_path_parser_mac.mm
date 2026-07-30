@@ -16,6 +16,7 @@
 #include "base/logging.h"
 #include "base/strings/sys_string_conversions.h"
 #include "build/branding_buildflags.h"
+#include "chrome/browser/policy/chrome_browser_policy_connector.h"
 #include "components/policy/policy_constants.h"
 
 namespace policy::path_parser {
@@ -97,16 +98,12 @@ base::FilePath::StringType ExpandPathVariables(
 void CheckUserDataDirPolicy(base::FilePath* user_data_dir) {
   // Since the configuration management infrastructure is not initialized when
   // this code runs, read the policy preference directly.
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  // Explicitly access the "com.google.Chrome" bundle ID, no matter what this
-  // app's bundle ID actually is. All channels of Chrome should obey the same
-  // policies.
-  CFStringRef bundle_id = CFSTR("com.google.Chrome");
-#else
   base::apple::ScopedCFTypeRef<CFStringRef> bundle_id_scoper =
-      base::SysUTF8ToCFStringRef(base::apple::BaseBundleID());
+      policy::ChromeBrowserPolicyConnector::GetBundleId();
   CFStringRef bundle_id = bundle_id_scoper.get();
-#endif
+  if (!bundle_id) {
+    return;
+  }
 
   base::apple::ScopedCFTypeRef<CFStringRef> key =
       base::SysUTF8ToCFStringRef(policy::key::kUserDataDir);
