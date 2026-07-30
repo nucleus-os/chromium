@@ -7,12 +7,14 @@
 
 #include <time.h>
 
+#include <cstdint>
 #include <memory>
 #include <ostream>
 #include <string>
 #include <vector>
 
 #include "base/containers/flat_map.h"
+#include "base/files/scoped_file.h"
 #include "base/memory/raw_ptr.h"
 #include "base/time/time.h"
 #include "ui/gl/gl_display.h"
@@ -452,6 +454,11 @@ class WaylandConnection {
       zwp_relative_pointer_manager_;
   std::unique_ptr<WaylandZwpPointerGestures> zwp_pointer_gestures_;
   std::unique_ptr<WaylandSeat> seat_;
+  // Opened from the compositor's DMA-BUF main_device feedback. The browser
+  // process uses this exact node for linux-drm-syncobj ioctls instead of a
+  // separately guessed DRM device.
+  base::ScopedFD compositor_drm_render_node_fd_;
+  uint64_t compositor_drm_device_id_ = 0;
   std::unique_ptr<WaylandBufferManagerHost> buffer_manager_host_;
   std::unique_ptr<XdgActivation> xdg_activation_;
   std::unique_ptr<XdgForeignWrapper> xdg_foreign_;

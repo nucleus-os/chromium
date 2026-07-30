@@ -8,6 +8,7 @@
 #include "base/gtest_prod_util.h"
 #include "base/memory/scoped_refptr.h"
 #include "gpu/command_buffer/service/memory_tracking.h"
+#include "gpu/command_buffer/service/shared_image/ozone_image_backing.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_representation.h"
 
 namespace gpu {
@@ -16,7 +17,6 @@ namespace gles2 {
 class TexturePassthrough;
 }  // namespace gles2
 
-class OzoneImageBacking;
 class OzoneImageGLTexturesHolder;
 
 // Representation of an Ozone-backed SharedImage that can be accessed as a
@@ -47,7 +47,7 @@ class GLTexturePassthroughOzoneImageRepresentation
   scoped_refptr<OzoneImageGLTexturesHolder> textures_holder_;
   const bool should_mark_context_lost_textures_holder_;
   GLenum current_access_mode_ = 0;
-  bool need_end_fence_ = false;
+  std::unique_ptr<OzoneImageBacking::ScopedAccess> backing_access_;
 };
 
 }  // namespace gpu

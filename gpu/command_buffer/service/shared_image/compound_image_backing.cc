@@ -585,8 +585,14 @@ class WrappedOverlayCompoundImageRepresentation
             SharedImageAccessStream::kOverlay)) {
       return false;
     }
-    return wrapped_->BeginReadAccess(acquire_fence);
+    if (!wrapped_->BeginReadAccess(acquire_fence)) {
+      compound_backing()->NotifyEndAccess(wrapped_->backing(),
+                                          AccessMode::kRead);
+      return false;
+    }
+    return true;
   }
+  void CommitReadAccess() final { wrapped_->CommitReadAccess(); }
   void EndReadAccess(gfx::GpuFenceHandle release_fence) final {
     wrapped_->EndReadAccess(std::move(release_fence));
     compound_backing()->NotifyEndAccess(wrapped_->backing(), AccessMode::kRead);
@@ -599,6 +605,24 @@ class WrappedOverlayCompoundImageRepresentation
   GetAHardwareBufferFenceSync() final {
     return wrapped_->GetAHardwareBufferFenceSync();
   }
+#elif BUILDFLAG(IS_OZONE)
+#if BUILDFLAG(ENABLE_VULKAN)
+  bool TakeExternalVulkanImageState(
+      std::optional<ExternalVulkanImageState>* state) final {
+    return wrapped_->TakeExternalVulkanImageState(state);
+  }
+  bool SetReleaseExternalVulkanImageState(
+      ExternalVulkanImageState release_state) final {
+    return wrapped_->SetReleaseExternalVulkanImageState(release_state);
+  }
+  bool AbandonExternalVulkanAccessForBackingDestruction() final {
+    if (!wrapped_->AbandonExternalVulkanAccessForBackingDestruction()) {
+      return false;
+    }
+    compound_backing()->NotifyEndAccess(wrapped_->backing(), AccessMode::kRead);
+    return true;
+  }
+#endif  // BUILDFLAG(ENABLE_VULKAN)
 #elif BUILDFLAG(IS_WIN)
   std::optional<gl::DCLayerOverlayImage> GetDCLayerOverlayImage() final {
     return wrapped_->GetDCLayerOverlayImage();
@@ -1884,8 +1908,9 @@ base::trace_event::MemoryAllocatorDump* CompoundImageBacking::OnMemoryDump(
   // texture or shared memory.
   for (int i = 0; i < static_cast<int>(elements_.size()); ++i) {
     auto* backing = elements_[i].backing.get();
-    if (!backing)
+    if (!backing) {
       continue;
+    }
 
     // When CompoundImageBacking wraps a single backing, use the client's global
     // Mailbox GUID instead of sub-backing GUID. This ensures correct effective

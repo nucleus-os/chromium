@@ -6,6 +6,7 @@
 
 #if BUILDFLAG(ENABLE_VULKAN)
 
+#include "base/logging.h"
 #include "gpu/command_buffer/service/shared_image/ozone_image_backing.h"
 
 namespace gpu {
@@ -30,38 +31,58 @@ bool VulkanOzoneImageRepresentation::BeginAccess(
     AccessMode access_mode,
     std::vector<VkSemaphore>& begin_semaphores,
     std::vector<VkSemaphore>& end_semaphores) {
-  std::vector<gfx::GpuFenceHandle> fences;
-  bool need_end_fence;
-  if (!ozone_backing()->BeginAccess(access_mode == AccessMode::kRead,
-                                    OzoneImageBacking::AccessStream::kVulkan,
-                                    &fences, need_end_fence)) {
+  backing_access_ =
+      ozone_backing()->BeginAccess(access_mode == AccessMode::kRead,
+                                   OzoneImageBacking::AccessStream::kVulkan);
+  if (!backing_access_) {
+    return false;
+  }
+  if (backing_access_->has_external_vulkan_state()) {
+    // The legacy raw-Vulkan representation does not expose the layout pair
+    // recorded by its caller. Fail closed rather than leaving a consumed
+    // ownership transfer attached to the backing.
+    LOG(ERROR) << "Raw Vulkan cannot acquire tracked external ownership";
+    backing_access_.reset();
     return false;
   }
 
-  if (need_end_fence) {
+  if (backing_access_->needs_end_fence()) {
     VkSemaphore end_semaphore = vulkan_impl_->CreateExternalSemaphore(
         vulkan_device_queue_->GetVulkanDevice());
+    if (end_semaphore == VK_NULL_HANDLE) {
+      backing_access_.reset();
+      return false;
+    }
     end_semaphores.emplace_back(end_semaphore);
   }
 
+  std::vector<gfx::GpuFenceHandle> fences = backing_access_->TakeBeginFences();
   for (auto& fence : fences) {
-    begin_semaphores.emplace_back(vulkan_impl_->ImportSemaphoreHandle(
+    VkSemaphore begin_semaphore = vulkan_impl_->ImportSemaphoreHandle(
         vulkan_device_queue_->GetVulkanDevice(),
-        SemaphoreHandle(std::move(fence))));
+        SemaphoreHandle(std::move(fence)));
+    if (begin_semaphore == VK_NULL_HANDLE) {
+      backing_access_.reset();
+      return false;
+    }
+    begin_semaphores.emplace_back(begin_semaphore);
   }
 
+  backing_access_->CommitAcquire();
   return true;
 }
 
 void VulkanOzoneImageRepresentation::EndAccess(bool is_read_only,
                                                VkSemaphore end_semaphore) {
+  gfx::GpuFenceHandle fence;
   if (end_semaphore != VK_NULL_HANDLE) {
-    ozone_backing()->EndAccess(
-        is_read_only, OzoneImageBacking::AccessStream::kVulkan,
+    fence =
         std::move(vulkan_impl_->GetSemaphoreHandle(
                       vulkan_device_queue_->GetVulkanDevice(), end_semaphore))
-            .ToGpuFenceHandle());
+            .ToGpuFenceHandle();
   }
+  backing_access_->End(std::move(fence));
+  backing_access_.reset();
 }
 
 }  // namespace gpu

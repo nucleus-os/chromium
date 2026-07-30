@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "gpu/command_buffer/service/shared_image/gl_ozone_image_representation.h"
+
 #include <memory>
 
 #include "base/check.h"
@@ -56,12 +57,13 @@ bool GLTexturePassthroughOzoneImageRepresentation::BeginAccess(GLenum mode) {
 
   auto* ozone_backing = GetOzoneBacking();
   bool readonly = mode != GL_SHARED_IMAGE_ACCESS_MODE_READWRITE_CHROMIUM;
-  std::vector<gfx::GpuFenceHandle> fences;
-  if (!ozone_backing->BeginAccess(readonly,
-                                  OzoneImageBacking::AccessStream::kGL, &fences,
-                                  need_end_fence_)) {
+  backing_access_ = ozone_backing->BeginAccess(
+      readonly, OzoneImageBacking::AccessStream::kGL);
+  if (!backing_access_) {
+    current_access_mode_ = 0;
     return false;
   }
+  std::vector<gfx::GpuFenceHandle> fences = backing_access_->TakeBeginFences();
 
   // ChromeOS VMs don't support gpu fences, so there is no good way to
   // synchronize with GL.
@@ -73,6 +75,7 @@ bool GLTexturePassthroughOzoneImageRepresentation::BeginAccess(GLenum mode) {
       gl_fence->ServerWait();
     }
   }
+  backing_access_->CommitAcquire();
   return true;
 }
 
@@ -80,7 +83,8 @@ void GLTexturePassthroughOzoneImageRepresentation::EndAccess() {
   gfx::GpuFenceHandle fence;
   // ChromeOS VMs don't support gpu fences, so there is no good way to
   // synchronize with GL.
-  if (gl::GLFence::IsGpuFenceSupported() && need_end_fence_) {
+  if (gl::GLFence::IsGpuFenceSupported() &&
+      backing_access_->needs_end_fence()) {
     if (auto gl_fence = gl::GLFence::CreateForGpuFence()) {
       auto gpu_fence = gl_fence->GetGpuFence();
       CHECK(gpu_fence);
@@ -89,10 +93,8 @@ void GLTexturePassthroughOzoneImageRepresentation::EndAccess() {
       DLOG(ERROR) << "Failed to create GPU fence";
     }
   }
-  bool readonly =
-      current_access_mode_ != GL_SHARED_IMAGE_ACCESS_MODE_READWRITE_CHROMIUM;
-  GetOzoneBacking()->EndAccess(readonly, OzoneImageBacking::AccessStream::kGL,
-                               std::move(fence));
+  backing_access_->End(std::move(fence));
+  backing_access_.reset();
   current_access_mode_ = 0;
 }
 

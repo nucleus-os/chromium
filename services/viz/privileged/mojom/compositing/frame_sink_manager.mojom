@@ -14,6 +14,7 @@ import "services/viz/privileged/mojom/compositing/features.mojom";
 import "services/viz/privileged/mojom/compositing/frame_sink_manager_test_api.mojom";
 import "services/viz/privileged/mojom/compositing/frame_sink_video_capture.mojom";
 import "services/viz/privileged/mojom/compositing/frame_sinks_metrics_recorder.mojom";
+import "services/viz/privileged/mojom/compositing/offscreen_output.mojom";
 import "services/viz/privileged/mojom/compositing/renderer_settings.mojom";
 import "services/viz/public/mojom/compositing/compositor_frame_sink.mojom";
 import "services/viz/public/mojom/compositing/copy_output_request.mojom";
@@ -72,6 +73,10 @@ struct RootCompositorFrameSinkParams {
       external_begin_frame_controller_client;
 
    bool use_proxy_output_device = false;
+  // Optional paired endpoints for an explicitly requested exportable
+  // offscreen root. Both endpoints must either be valid or absent.
+  pending_remote<OffscreenOutputClient>? offscreen_output_client;
+  pending_receiver<OffscreenOutput>? offscreen_output;
 };
 
 // The FrameSinkManager interface is a privileged interface that allows the

@@ -399,6 +399,16 @@ void VizProcessTransportFactory::OnEstablishedGpuChannel(
         compositor->delegate()->CreateHostDisplayClient();
     root_params->use_proxy_output_device =
         compositor->delegate()->UseProxyOutputDevice();
+    mojo::PendingRemote<viz::mojom::OffscreenOutputClient>
+        offscreen_output_client;
+    mojo::PendingReceiver<viz::mojom::OffscreenOutput> offscreen_output;
+    if (compositor->delegate()->CreateOffscreenOutputEndpoints(
+            &offscreen_output_client, &offscreen_output)) {
+      CHECK(offscreen_output_client.is_valid());
+      CHECK(offscreen_output.is_valid());
+      root_params->offscreen_output_client = std::move(offscreen_output_client);
+      root_params->offscreen_output = std::move(offscreen_output);
+    }
   } else {
     compositor_data.display_client =
         std::make_unique<HostDisplayClient>(compositor);

@@ -5,6 +5,8 @@
 #ifndef GPU_COMMAND_BUFFER_SERVICE_SHARED_IMAGE_SHARED_IMAGE_FORMAT_SERVICE_UTILS_H_
 #define GPU_COMMAND_BUFFER_SERVICE_SHARED_IMAGE_SHARED_IMAGE_FORMAT_SERVICE_UTILS_H_
 
+#include <optional>
+
 #include "build/build_config.h"
 #include "components/viz/common/resources/shared_image_format.h"
 #include "gpu/command_buffer/common/gl2_types.h"
@@ -73,6 +75,13 @@ GPU_GLES2_EXPORT SkYUVAInfo::Subsampling ToSkYUVASubsampling(
 GPU_GLES2_EXPORT SkColorType
 ToClosestSkColorTypeExternalSampler(viz::SharedImageFormat format);
 
+// Graphite-Dawn can consume external-sampler multiplanar images as a single
+// YCbCr texture only on platforms where Chromium supplies the required native
+// YCbCr descriptor. Other platforms must expose one Dawn texture view per
+// plane and let Skia perform the YUV conversion.
+GPU_GLES2_EXPORT bool GraphiteDawnUsesExternalSampler(
+    viz::SharedImageFormat format);
+
 // Holds capabilities and provides accessors for getting appropriate GL formats
 // for shared images.
 class GPU_GLES2_EXPORT GLFormatCaps {
@@ -136,8 +145,12 @@ GPU_GLES2_EXPORT VkFormat ToVkFormat(viz::SharedImageFormat format,
 GPU_GLES2_EXPORT DXGI_FORMAT ToDXGIFormat(viz::SharedImageFormat format);
 #endif  // BUILDFLAG(IS_WIN)
 
-// Following functions return the appropriate Dawn format for a
-// SharedImageFormat. Returns wgpu::TextureFormat format for given `format`.
+// Returns the appropriate Dawn format when `format` has a Dawn equivalent,
+// or nullopt otherwise.
+GPU_GLES2_EXPORT std::optional<wgpu::TextureFormat> MaybeToDawnFormat(
+    viz::SharedImageFormat format);
+// Returns the appropriate Dawn format for `format`, which must have a Dawn
+// equivalent.
 // Note that this will return a multi-planar Dawn format for multi-planar
 // SharedImageFormat.
 GPU_GLES2_EXPORT wgpu::TextureFormat ToDawnFormat(

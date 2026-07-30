@@ -129,5 +129,23 @@ TEST(ServiceUtilsTest, ParseGpuPreferencesIgnoreGpuBlocklist) {
   }
 }
 
+TEST(ServiceUtilsTest, RequiredGraphiteDawnVulkanHasNoFallback) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{features::kSkiaGraphite},
+      /*disabled_features=*/{});
+  base::CommandLine command_line(base::CommandLine::NO_PROGRAM);
+  command_line.AppendSwitch(switches::kEnableSkiaGraphite);
+  command_line.AppendSwitchASCII(switches::kSkiaGraphiteDawnBackend,
+                                 switches::kSkiaGraphiteDawnBackendVulkan);
+  command_line.AppendSwitch(
+      switches::kRequireSkiaGraphiteDawnVulkan);
+
+  GpuPreferences preferences = gles2::ParseGpuPreferences(&command_line);
+
+  EXPECT_EQ(preferences.gr_context_type, GrContextType::kGraphiteDawn);
+  EXPECT_TRUE(preferences.fallback_gr_context_types.empty());
+}
+
 }  // namespace
 }  // namespace gpu

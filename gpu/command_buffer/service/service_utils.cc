@@ -304,7 +304,13 @@ GpuPreferences ParseGpuPreferences(const base::CommandLine* command_line) {
         base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
   }
   gpu_preferences.gr_context_type = ParseDefaultGrContextType(command_line);
-  if (gpu_preferences.gr_context_type == GrContextType::kGraphiteDawn ||
+  if (command_line->HasSwitch(
+          switches::kRequireSkiaGraphiteDawnVulkan)) {
+    CHECK_EQ(gpu_preferences.gr_context_type,
+             GrContextType::kGraphiteDawn);
+    gpu_preferences.fallback_gr_context_types.clear();
+  } else if (gpu_preferences.gr_context_type ==
+                 GrContextType::kGraphiteDawn ||
       gpu_preferences.gr_context_type == GrContextType::kVulkan) {
     // Set the default fallback type to GL so that the tests can fall back to GL
     // without GpuDataManagerImplPrivate.
@@ -331,6 +337,25 @@ GpuPreferences ParseGpuPreferences(const base::CommandLine* command_line) {
 }
 
 GrContextType ParseDefaultGrContextType(const base::CommandLine* command_line) {
+  if (command_line->HasSwitch(
+          switches::kRequireSkiaGraphiteDawnVulkan)) {
+#if BUILDFLAG(SKIA_USE_DAWN)
+    CHECK(!command_line->HasSwitch(switches::kDisableSkiaGraphite))
+        << "Graphite/Dawn/Vulkan is required but Graphite is disabled";
+    CHECK(features::IsSkiaGraphiteEnabled(command_line))
+        << "Graphite/Dawn/Vulkan is required but Graphite is unavailable";
+    CHECK_EQ(command_line->GetSwitchValueASCII(
+                 switches::kSkiaGraphiteDawnBackend),
+             switches::kSkiaGraphiteDawnBackendVulkan)
+        << "Graphite/Dawn/Vulkan is required but Dawn is not configured for "
+           "Vulkan";
+    return GrContextType::kGraphiteDawn;
+#else
+    LOG(FATAL) << "Graphite/Dawn/Vulkan is required but this build has no "
+                  "Dawn-backed Graphite support";
+#endif
+  }
+
 #if BUILDFLAG(SKIA_USE_DAWN)
   if (base::FeatureList::IsEnabled(features::kLateGraphiteFeatureCheck)) {
     // With late check, only the disable flag gates Graphite; the full

@@ -47,6 +47,7 @@
 #include "components/viz/service/display/renderer_pixeltest_utils.h"
 #include "components/viz/service/display/software_renderer.h"
 #include "components/viz/service/display/viz_pixel_test.h"
+#include "components/viz/service/display_embedder/skia_output_surface_impl.h"
 #include "components/viz/test/buildflags.h"
 #include "components/viz/test/test_in_process_context_provider.h"
 #include "components/viz/test/test_types.h"
@@ -2086,7 +2087,14 @@ TEST_P(RendererPixelTest, RenderPassAndMaskForRoundedCornerMultiRadii) {
 class RendererPixelTestWithBackdropFilter : public VizPixelTestWithParam {
  protected:
   void SetUp() override {
+    renderer_settings_.requires_alpha_channel = true;
     VizPixelTestWithParam::SetUp();
+    if (!is_software_renderer()) {
+      static_cast<SkiaOutputSurfaceImpl*>(output_surface_.get())
+          ->SetCapabilitiesForTesting(
+              GetSurfaceOrigin(),
+              /*backdrop_filters_replace_destination=*/true);
+    }
     filter_pass_layer_rect_ = gfx::Rect(device_viewport_size_);
     filter_pass_layer_rect_.Inset(gfx::Insets::TLBR(14, 12, 18, 16));
     backdrop_filter_bounds_ =
@@ -2296,6 +2304,71 @@ TEST_P(RendererPixelTestWithBackdropFilter, InvertFilterWithMask) {
 
   EXPECT_TRUE(RunPixelTest(&pass_list_, expected_path,
                            cc::FuzzyPixelOffByOneComparator()));
+}
+
+TEST_P(RendererPixelTestWithBackdropFilter,
+       TransparentRootConsumesOnlyBackdropBounds) {
+  if (is_software_renderer()) {
+    GTEST_SKIP() << "Backdrop replacement is an offscreen Skia output "
+                    "capability.";
+  }
+
+  const gfx::Rect viewport(device_viewport_size_);
+  const gfx::Rect filter_rect(0, 0, viewport.width() / 2, viewport.height());
+  const gfx::Transform identity;
+
+  auto filter_pass =
+      CreateTestRenderPass(AggregatedRenderPassId{2}, filter_rect, identity);
+  SharedQuadState* filter_shared_state = CreateTestSharedQuadState(
+      identity, filter_rect, filter_pass.get(), gfx::MaskFilterInfo());
+  auto* transparent =
+      filter_pass->CreateAndAppendDrawQuad<SolidColorDrawQuad>();
+  transparent->SetNew(filter_shared_state, filter_rect, filter_rect,
+                      SkColors::kTransparent, false);
+
+  auto root_pass =
+      CreateTestRootRenderPass(AggregatedRenderPassId{1}, viewport);
+  root_pass->has_transparent_background = true;
+
+  SharedQuadState* layer_shared_state = CreateTestSharedQuadState(
+      identity, filter_rect, root_pass.get(), gfx::MaskFilterInfo());
+  auto* filter_quad =
+      root_pass->CreateAndAppendDrawQuad<AggregatedRenderPassDrawQuad>();
+  filter_quad->SetNew(layer_shared_state, filter_rect, filter_rect,
+                      AggregatedRenderPassId{2}, ResourceId(0), gfx::RectF(),
+                      gfx::Size(),
+                      /*force_anti_aliasing_off=*/false);
+  cc::FilterOperations backdrop_filters;
+  backdrop_filters.Append(cc::FilterOperation::CreateOpacityFilter(0.5f));
+  filter_quad->SetFilters(
+      /*filters=*/{}, backdrop_filters,
+      SkPath::Rect(gfx::RectToSkRect(filter_rect)),
+      /*filters_scale=*/gfx::Vector2dF(1.0f, 1.0f),
+      /*filters_origin=*/gfx::PointF(),
+      /*backdrop_filter_quality=*/1.0f);
+
+  SharedQuadState* red_shared_state = CreateTestSharedQuadState(
+      identity, viewport, root_pass.get(), gfx::MaskFilterInfo());
+  auto* red = root_pass->CreateAndAppendDrawQuad<SolidColorDrawQuad>();
+  red->SetNew(red_shared_state, viewport, viewport, SkColors::kRed, false);
+
+  AggregatedRenderPassList pass_list;
+  pass_list.push_back(std::move(filter_pass));
+  pass_list.push_back(std::move(root_pass));
+
+  std::vector<SkColor> expected(viewport.width() * viewport.height());
+  for (int y = 0; y < viewport.height(); ++y) {
+    for (int x = 0; x < viewport.width(); ++x) {
+      expected[y * viewport.width() + x] = x < filter_rect.width()
+                                               ? SkColorSetARGB(128, 255, 0, 0)
+                                               : SkColors::kRed.toSkColor();
+    }
+  }
+
+  auto comparator = cc::FuzzyPixelComparator()
+                        .SetErrorPixelsPercentageLimit(100.f)
+                        .SetAbsErrorLimit(3);
+  EXPECT_TRUE(RunPixelTest(&pass_list, &expected, comparator));
 }
 
 // Software renderer does not support anti-aliased edges.

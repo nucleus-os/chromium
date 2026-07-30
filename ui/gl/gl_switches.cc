@@ -91,6 +91,7 @@ const char kEnableGPUServiceTracing[]       = "enable-gpu-service-tracing";
 //  gl: Desktop GL renderer, ES2 and ES3.
 //  gles: GLES renderer, ES2 and ES3.
 const char kUseANGLE[]                      = "use-angle";
+const char kVulkanDeviceUuid[]              = "vulkan-device-uuid";
 
 #if BUILDFLAG(USE_STATIC_ANGLE)
 // Use ANGLE shared libraries even if ANGLE is built as a static library.
@@ -298,7 +299,12 @@ BASE_FEATURE(kDefaultANGLEMetal, base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Default to using ANGLE's Vulkan backend.
 BASE_FEATURE(kDefaultANGLEVulkan,
-             base::FEATURE_DISABLED_BY_DEFAULT);
+#if BUILDFLAG(IS_LINUX)
+             base::FEATURE_ENABLED_BY_DEFAULT
+#else
+             base::FEATURE_DISABLED_BY_DEFAULT
+#endif
+);
 
 // Track current program's shaders at glUseProgram() call for crash report
 // purpose. Only effective on Windows because the attached shaders may only
@@ -307,7 +313,12 @@ BASE_FEATURE(kTrackCurrentShaders, base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enable sharing Vulkan device queue with ANGLE's Vulkan backend.
 BASE_FEATURE(kVulkanFromANGLE,
-             base::FEATURE_DISABLED_BY_DEFAULT);
+#if BUILDFLAG(IS_LINUX)
+             base::FEATURE_ENABLED_BY_DEFAULT
+#else
+             base::FEATURE_DISABLED_BY_DEFAULT
+#endif
+);
 
 // Enable skipping the Vulkan blocklist.
 BASE_FEATURE(kSkipVulkanBlocklist,

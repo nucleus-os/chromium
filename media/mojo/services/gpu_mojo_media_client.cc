@@ -5,8 +5,10 @@
 #include "media/mojo/services/gpu_mojo_media_client.h"
 
 #include <optional>
+#include <string>
 #include <utility>
 
+#include "base/command_line.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
@@ -15,6 +17,7 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "build/build_config.h"
+#include "gpu/config/gpu_switches.h"
 #include "gpu/ipc/service/gpu_channel.h"
 #include "media/base/audio_decoder.h"
 #include "media/base/audio_encoder.h"
@@ -54,6 +57,18 @@ gpu::CommandBufferStub* GetCommandBufferStub(
   return stub;
 }
 
+bool IsVulkanRenderingContext(const gpu::GpuPreferences& gpu_preferences) {
+  if (gpu_preferences.gr_context_type !=
+      gpu::GrContextType::kGraphiteDawn) {
+    return gpu_preferences.gr_context_type == gpu::GrContextType::kVulkan;
+  }
+
+  const std::string dawn_backend =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          switches::kSkiaGraphiteDawnBackend);
+  return dawn_backend == switches::kSkiaGraphiteDawnBackendVulkan;
+}
+
 bool IsAcceleratedDecodingDisabled(
     const gpu::GpuPreferences& gpu_preferences,
     const gpu::GpuFeatureInfo& gpu_feature_info) {
@@ -61,9 +76,10 @@ bool IsAcceleratedDecodingDisabled(
          gpu_feature_info.status_values
                  [gpu::GPU_FEATURE_TYPE_ACCELERATED_VIDEO_DECODE] !=
              gpu::kGpuFeatureStatusEnabled ||
-         // For some reason the GpuPreferences and GpuFeatureInfo may not be
-         // up to date in this case.
-         gl::GetGLImplementation() == gl::kGLImplementationDisabled;
+         // This legacy consistency check is only meaningful for GL rendering.
+         // Vulkan-backed Graphite does not require a live GL implementation.
+         (!IsVulkanRenderingContext(gpu_preferences) &&
+          gl::GetGLImplementation() == gl::kGLImplementationDisabled);
 }
 
 }  // namespace

@@ -4,8 +4,17 @@
 
 #include "gpu/command_buffer/service/dawn_context_provider.h"
 
+#include <algorithm>
 #include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <vector>
+
+#if defined(__linux__)
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
+#endif
 
 #include "base/check_op.h"
 #include "base/command_line.h"
@@ -68,6 +77,50 @@
 
 namespace gpu {
 namespace {
+
+#if BUILDFLAG(IS_LINUX)
+struct DrmRenderNode {
+  std::string path;
+  uint32_t major = 0;
+  uint32_t minor = 0;
+};
+
+bool GetRequestedDrmRenderNode(std::optional<DrmRenderNode>* node) {
+  const base::CommandLine* command_line =
+      base::CommandLine::ForCurrentProcess();
+  if (!command_line->HasSwitch("render-node-override")) {
+    node->reset();
+    return true;
+  }
+
+  DrmRenderNode requested{
+      .path = command_line->GetSwitchValueASCII("render-node-override"),
+  };
+  struct stat node_stat{};
+  if (requested.path.empty() || stat(requested.path.c_str(), &node_stat) != 0 ||
+      !S_ISCHR(node_stat.st_mode)) {
+    LOG(ERROR) << "Invalid DRM render node override: " << requested.path;
+    return false;
+  }
+  requested.major = major(node_stat.st_rdev);
+  requested.minor = minor(node_stat.st_rdev);
+  *node = std::move(requested);
+  return true;
+}
+
+bool DawnAdapterMatchesDrmRenderNode(wgpu::Adapter adapter,
+                                     const DrmRenderNode& node) {
+  if (!adapter.HasFeature(wgpu::FeatureName::AdapterPropertiesDrm)) {
+    return false;
+  }
+  wgpu::AdapterPropertiesDrm drm_properties;
+  wgpu::AdapterInfo adapter_info;
+  adapter_info.nextInChain = &drm_properties;
+  return adapter.GetInfo(&adapter_info) == wgpu::Status::Success &&
+         drm_properties.hasRender && drm_properties.renderMajor == node.major &&
+         drm_properties.renderMinor == node.minor;
+}
+#endif  // BUILDFLAG(IS_LINUX)
 
 // Used as a flag to test dawn initialization failure.
 BASE_FEATURE(kForceDawnInitializeFailure, base::FEATURE_DISABLED_BY_DEFAULT);
@@ -302,15 +355,19 @@ std::vector<wgpu::FeatureName> GetRequiredFeatures(
       wgpu::FeatureName::MultiPlanarFormatNv12a,
       wgpu::FeatureName::MultiPlanarRenderTargets,
       wgpu::FeatureName::Unorm16TextureFormats,
+      wgpu::FeatureName::Unorm16FormatsForExternalTexture,
 
       // The following features are always supported by the the Metal backend on
       // the Mac versions on which Chrome runs.
       wgpu::FeatureName::SharedTextureMemoryIOSurface,
       wgpu::FeatureName::SharedFenceMTLSharedEvent,
 
-      // The following features are always supported when running on the Vulkan
-      // backend on Android.
+      // Vulkan external-memory features used by platform SharedImage
+      // backings. Unsupported optional features are skipped below.
       wgpu::FeatureName::SharedTextureMemoryAHardwareBuffer,
+#if BUILDFLAG(IS_LINUX)
+      wgpu::FeatureName::SharedTextureMemoryDmaBuf,
+#endif
       wgpu::FeatureName::SharedFenceSyncFD,
       wgpu::FeatureName::RenderPassRenderArea,
       wgpu::FeatureName::OpaqueYCbCrAndroidForExternalTexture,
@@ -938,7 +995,75 @@ bool DawnSharedContext::Initialize(
                    backend_type, force_fallback_adapter);
     return false;
   }
+#if BUILDFLAG(IS_LINUX)
+  std::optional<DrmRenderNode> requested_render_node;
+  if (!GetRequestedDrmRenderNode(&requested_render_node)) {
+    LogInitFailure("Invalid DRM render node override.",
+                   /*generate_crash_report=*/false, backend_type,
+                   force_fallback_adapter);
+    return false;
+  }
+  if (requested_render_node && backend_type != wgpu::BackendType::Vulkan) {
+    LogInitFailure(
+        "A DRM render node was requested for a non-Vulkan Dawn "
+        "backend.",
+        /*generate_crash_report=*/false, backend_type, force_fallback_adapter);
+    return false;
+  }
+  if (requested_render_node) {
+    auto selected = std::ranges::find_if(
+        adapters,
+        [&requested_render_node](const dawn::native::Adapter& native) {
+          return DawnAdapterMatchesDrmRenderNode(wgpu::Adapter(native.Get()),
+                                                 *requested_render_node);
+        });
+    if (selected == adapters.end()) {
+      LogInitFailure(
+          "No Dawn Vulkan adapter matched the requested DRM render "
+          "node.",
+          /*generate_crash_report=*/false, backend_type,
+          force_fallback_adapter);
+      return false;
+    }
+    adapter_ = wgpu::Adapter(selected->Get());
+
+    wgpu::AdapterInfo adapter_info;
+    CHECK_EQ(adapter_.GetInfo(&adapter_info), wgpu::Status::Success);
+    LOG(INFO) << "Skia backend: Graphite/Dawn/Vulkan; Dawn adapter: "
+              << std::string_view(adapter_info.device.data,
+                                  adapter_info.device.length)
+              << "; DRM render node: " << requested_render_node->path;
+  } else {
+    adapter_ = wgpu::Adapter(adapters[0].Get());
+  }
+
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kRequireSkiaGraphiteDawnVulkan)) {
+    if (!requested_render_node) {
+      LogInitFailure(
+          "Graphite/Dawn/Vulkan requires the compositor DRM render node.",
+          /*generate_crash_report=*/false, backend_type,
+          force_fallback_adapter);
+      return false;
+    }
+    constexpr wgpu::FeatureName kRequiredLinuxExternalFeatures[] = {
+        wgpu::FeatureName::SharedTextureMemoryDmaBuf,
+        wgpu::FeatureName::SharedFenceSyncFD,
+    };
+    for (wgpu::FeatureName feature : kRequiredLinuxExternalFeatures) {
+      if (!adapter_.HasFeature(feature)) {
+        LogInitFailure(
+            "The compositor-selected Dawn adapter lacks required Linux "
+            "DMA-BUF or sync-fd support.",
+            /*generate_crash_report=*/false, backend_type,
+            force_fallback_adapter);
+        return false;
+      }
+    }
+  }
+#else
   adapter_ = wgpu::Adapter(adapters[0].Get());
+#endif
 
   if (!validate_adapter_fn(backend_type, adapter_)) {
     LogInitFailure("Validate adapter failed.",

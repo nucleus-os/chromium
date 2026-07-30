@@ -331,6 +331,9 @@ test("gl_tests") {
     }
     deps += [ "//ui/ozone" ]
     sources += [ "command_buffer/service/shared_image/ozone_image_backing_factory_unittest.cc" ]
+    if (is_linux && skia_use_dawn) {
+      sources += [ "command_buffer/service/shared_image/graphite_dawn_multiplanar_unittest.cc" ]
+    }
   }
 
   if (enable_vulkan) {

@@ -45,6 +45,7 @@
 #include "components/viz/service/display/overlay_candidate.h"
 #include "components/viz/service/display/render_pass_alpha_type.h"
 #include "components/viz/service/display_embedder/image_context_impl.h"
+#include "components/viz/service/display_embedder/offscreen_output_connection.h"
 #include "components/viz/service/display_embedder/skia_output_surface_dependency.h"
 #include "components/viz/service/display_embedder/skia_output_surface_impl_on_gpu.h"
 #include "components/viz/service/display_embedder/skia_output_surface_shared_image_interface.h"
@@ -313,12 +314,21 @@ std::unique_ptr<SkiaOutputSurface> SkiaOutputSurfaceImpl::Create(
     DisplayCompositorMemoryAndTaskController* display_controller,
     const RendererSettings& renderer_settings,
     const DebugRendererSettings* debug_settings) {
+  return Create(display_controller, renderer_settings, debug_settings, nullptr);
+}
+
+// static
+std::unique_ptr<SkiaOutputSurface> SkiaOutputSurfaceImpl::Create(
+    DisplayCompositorMemoryAndTaskController* display_controller,
+    const RendererSettings& renderer_settings,
+    const DebugRendererSettings* debug_settings,
+    std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection) {
   DCHECK(display_controller);
   DCHECK(display_controller->skia_dependency());
   DCHECK(display_controller->gpu_task_scheduler());
   auto output_surface = std::make_unique<SkiaOutputSurfaceImpl>(
       base::PassKey<SkiaOutputSurfaceImpl>(), display_controller,
-      renderer_settings, debug_settings);
+      renderer_settings, debug_settings, std::move(offscreen_output_connection));
   if (!output_surface->Initialize())
     output_surface = nullptr;
   return output_surface;
@@ -328,8 +338,10 @@ SkiaOutputSurfaceImpl::SkiaOutputSurfaceImpl(
     base::PassKey<SkiaOutputSurfaceImpl> /* pass_key */,
     DisplayCompositorMemoryAndTaskController* display_controller,
     const RendererSettings& renderer_settings,
-    const DebugRendererSettings* debug_settings)
+    const DebugRendererSettings* debug_settings,
+    std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection)
     : dependency_(display_controller->skia_dependency()),
+      offscreen_output_connection_(std::move(offscreen_output_connection)),
       renderer_settings_(renderer_settings),
       debug_settings_(debug_settings),
       display_compositor_controller_(display_controller),
@@ -574,7 +586,11 @@ void SkiaOutputSurfaceImpl::MakePromiseSkImage(
     return;
 
   auto format = image_context->format();
-  if (format.is_single_plane() || format.PrefersExternalSampler()) {
+  const bool use_graphite_external_sampler =
+      graphite_recorder_ && gpu::GraphiteDawnUsesExternalSampler(format);
+  if (format.is_single_plane() ||
+      (format.PrefersExternalSampler() && !graphite_recorder_) ||
+      use_graphite_external_sampler) {
     MakePromiseSkImageSinglePlane(image_context_impl, /*mipmapped=*/false,
                                   force_rgbx);
   } else {
@@ -661,9 +677,9 @@ void SkiaOutputSurfaceImpl::MakePromiseSkImageMultiPlane(
   if (graphite_recorder_) {
     // This function is for per-plane sampling and is never used in conjunction
     // with YCbCr sampling. In particular, on Android SharedImages used with
-    // YCbCr sampling always have RGBA format and on ChromeOS such SharedImages
-    // will have PrefersExternalSampler() set to true. Both of these cases are
-    // handled by MakePromiseSkImageSinglePlane().
+    // YCbCr sampling always have RGBA format. On platforms where
+    // Graphite-Dawn has no native YCbCr descriptor, images marked as preferring
+    // an external sampler intentionally take this per-plane path instead.
     // TODO(blundell): Hoist this CHECK up to apply universally for Ganesh as
     // well as Graphite.
     CHECK(!image_context->ycbcr_info());
@@ -1064,10 +1080,13 @@ void SkiaOutputSurfaceImpl::SetFrameRate(
 #endif
 
 void SkiaOutputSurfaceImpl::SetCapabilitiesForTesting(
-    gfx::SurfaceOrigin output_surface_origin) {
+    gfx::SurfaceOrigin output_surface_origin,
+    bool backdrop_filters_replace_destination) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(impl_on_gpu_);
   capabilities_.output_surface_origin = output_surface_origin;
+  capabilities_.backdrop_filters_replace_destination =
+      backdrop_filters_replace_destination;
   auto callback =
       base::BindOnce(&SkiaOutputSurfaceImplOnGpu::SetCapabilitiesForTesting,
                      base::Unretained(impl_on_gpu_.get()), capabilities_);
@@ -1157,7 +1176,8 @@ void SkiaOutputSurfaceImpl::InitializeOnGpuThread(
       std::move(buffer_presented_callback), std::move(context_lost_callback),
       std::move(schedule_gpu_task),
       std::move(add_child_window_to_browser_callback),
-      std::move(release_overlays_callback));
+      std::move(release_overlays_callback),
+      std::move(offscreen_output_connection_));
   if (!impl_on_gpu_) {
     *out_result = std::nullopt;
     return;

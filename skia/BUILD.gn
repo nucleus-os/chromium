@@ -1214,6 +1214,7 @@ source_set("test_fonts") {
 
 test("skia_unittests") {
   sources = [
+    "ext/backdrop_replacement_unittest.cc",
     "ext/codec_utils_unittest.cc",
     "ext/convolver_unittest.cc",
     "ext/geometry_unittest.cc",

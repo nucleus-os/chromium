@@ -5,10 +5,13 @@
 #include "media/mojo/services/gpu_mojo_media_client.h"
 
 #include <algorithm>
+#include <string>
 
+#include "base/command_line.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "components/viz/common/resources/shared_image_format.h"
+#include "gpu/config/gpu_switches.h"
 #include "gpu/config/gpu_feature_info.h"
 #include "media/base/audio_decoder.h"
 #include "media/base/audio_encoder.h"
@@ -29,6 +32,24 @@ BASE_FEATURE(kAcceleratedVideoDecodeLinuxZeroCopyGL,
 
 BASE_FEATURE(kRenderableMM21, base::FEATURE_DISABLED_BY_DEFAULT);
 
+bool IsGraphiteDawnVulkanContext(
+    const gpu::GpuPreferences& gpu_preferences) {
+  if (gpu_preferences.gr_context_type !=
+      gpu::GrContextType::kGraphiteDawn) {
+    return false;
+  }
+
+  const std::string dawn_backend =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          switches::kSkiaGraphiteDawnBackend);
+  return dawn_backend == switches::kSkiaGraphiteDawnBackendVulkan;
+}
+
+bool IsVulkanRenderingContext(const gpu::GpuPreferences& gpu_preferences) {
+  return gpu_preferences.gr_context_type == gpu::GrContextType::kVulkan ||
+         IsGraphiteDawnVulkanContext(gpu_preferences);
+}
+
 VideoDecoderType GetPreferredLinuxDecoderImplementation() {
   // VaapiVideoDecoder flag is required for VaapiVideoDecoder.
   if (!base::FeatureList::IsEnabled(kAcceleratedVideoDecodeLinux)) {
@@ -48,9 +69,17 @@ std::vector<Fourcc> GetPreferredRenderableFourccs(
   std::vector<Fourcc> renderable_fourccs;
 #if BUILDFLAG(ENABLE_VULKAN)
   // Support for zero-copy NV12/P010 textures preferentially.
-  if (gpu_preferences.gr_context_type == gpu::GrContextType::kVulkan) {
+  if (IsVulkanRenderingContext(gpu_preferences)) {
     renderable_fourccs.emplace_back(Fourcc::NV12);
     renderable_fourccs.emplace_back(Fourcc::P010);
+    if (IsGraphiteDawnVulkanContext(gpu_preferences) &&
+        base::CommandLine::ForCurrentProcess()->HasSwitch(
+            switches::kRequireSkiaGraphiteDawnVulkan)) {
+      // The required renderer imports decoded YUV allocations directly.
+      // Do not advertise the one-copy ARGB conversion path as a silent media
+      // fallback when native multiplanar import is unavailable.
+      return renderable_fourccs;
+    }
   } else
 #endif  // BUILDFLAG(ENABLE_VULKAN)
 #if BUILDFLAG(IS_OZONE)
@@ -115,7 +144,7 @@ VideoDecoderType GetActualPlatformDecoderImplementation(
         }
       }
 #if BUILDFLAG(ENABLE_VULKAN)
-      if (gpu_preferences.gr_context_type != gpu::GrContextType::kVulkan) {
+      if (!IsVulkanRenderingContext(gpu_preferences)) {
         return VideoDecoderType::kUnknown;
       }
       if (!base::FeatureList::IsEnabled(features::kVulkanFromANGLE)) {
@@ -123,6 +152,13 @@ VideoDecoderType GetActualPlatformDecoderImplementation(
       }
       if (!base::FeatureList::IsEnabled(features::kDefaultANGLEVulkan)) {
         return VideoDecoderType::kUnknown;
+      }
+      // Graphite-Dawn owns its Vulkan instance instead of Chromium's native
+      // Vulkan implementation, so it does not populate GPUInfo::vulkan_info.
+      // Its Vulkan adapter and VA-API render node are selected and validated
+      // independently, making the native-Vulkan GPUInfo check inapplicable.
+      if (IsGraphiteDawnVulkanContext(gpu_preferences)) {
+        return VideoDecoderType::kVaapi;
       }
       // If Vulkan is active, check Vulkan info if VaapiVideoDecoder is allowed.
       if (!gpu_info.vulkan_info.has_value()) {

@@ -92,6 +92,7 @@
 #include "content/public/common/profiling.h"
 #include "content/public/common/url_constants.h"
 #include "extensions/buildflags/buildflags.h"
+#include "gpu/config/gpu_switches.h"
 #include "net/http/http_cache.h"
 #include "net/url_request/url_request.h"
 #include "pdf/buildflags.h"
@@ -102,6 +103,8 @@
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/base/resource/scoped_startup_resource_bundle.h"
 #include "ui/base/ui_base_switches.h"
+#include "ui/gl/gl_switches.h"
+#include "ui/ozone/public/ozone_switches.h"
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || \
     BUILDFLAG(IS_MAC)
@@ -1080,6 +1083,54 @@ void ChromeMainDelegate::SetupTracing() {
 std::optional<int> ChromeMainDelegate::BasicStartupComplete() {
 #if BUILDFLAG(IS_CHROMEOS)
   ash::BootTimesRecorder::Get()->SaveChromeMainStats();
+#endif
+
+#if BUILDFLAG(IS_LINUX)
+  base::CommandLine* product_command_line =
+      base::CommandLine::ForCurrentProcess();
+  if (!product_command_line->HasSwitch(switches::kProcessType)) {
+    CHECK(!product_command_line->HasSwitch(switches::kDisableGpu))
+        << "This Chromium build requires GPU acceleration";
+    CHECK(!product_command_line->HasSwitch(switches::kDisableGpuCompositing))
+        << "This Chromium build requires GPU compositing";
+    CHECK(!product_command_line->HasSwitch(switches::kDisableSkiaGraphite))
+        << "This Chromium build requires Skia Graphite";
+    CHECK(!product_command_line->HasSwitch(switches::kOzonePlatform) ||
+          product_command_line->GetSwitchValueASCII(
+              switches::kOzonePlatform) == "wayland")
+        << "This Chromium build requires native Wayland";
+    CHECK(!product_command_line->HasSwitch(switches::kUseGL) ||
+          product_command_line->GetSwitchValueASCII(switches::kUseGL) ==
+              gl::kGLImplementationANGLEName)
+        << "This Chromium build permits only ANGLE for GL API compatibility";
+    CHECK(!product_command_line->HasSwitch(switches::kUseANGLE) ||
+          product_command_line->GetSwitchValueASCII(switches::kUseANGLE) ==
+              gl::kANGLEImplementationVulkanName)
+        << "This Chromium build requires ANGLE's Vulkan backend";
+    CHECK(!product_command_line->HasSwitch(
+              switches::kSkiaGraphiteDawnBackend) ||
+          product_command_line->GetSwitchValueASCII(
+              switches::kSkiaGraphiteDawnBackend) ==
+              switches::kSkiaGraphiteDawnBackendVulkan)
+        << "This Chromium build requires Dawn's Vulkan backend";
+    if (!product_command_line->HasSwitch(switches::kOzonePlatform)) {
+      product_command_line->AppendSwitchASCII(switches::kOzonePlatform,
+                                               "wayland");
+    }
+    if (!product_command_line->HasSwitch(switches::kUseANGLE)) {
+      product_command_line->AppendSwitchASCII(
+          switches::kUseANGLE, gl::kANGLEImplementationVulkanName);
+    }
+    product_command_line->AppendSwitch(switches::kEnableSkiaGraphite);
+    if (!product_command_line->HasSwitch(
+            switches::kSkiaGraphiteDawnBackend)) {
+      product_command_line->AppendSwitchASCII(
+          switches::kSkiaGraphiteDawnBackend,
+          switches::kSkiaGraphiteDawnBackendVulkan);
+    }
+    product_command_line->AppendSwitch(
+        switches::kRequireSkiaGraphiteDawnVulkan);
+  }
 #endif
 
   const base::CommandLine& command_line =

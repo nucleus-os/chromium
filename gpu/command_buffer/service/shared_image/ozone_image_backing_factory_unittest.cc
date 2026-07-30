@@ -4,6 +4,7 @@
 
 #include "gpu/command_buffer/service/shared_image/ozone_image_backing_factory.h"
 
+#include "base/files/file_util.h"
 #include "cc/test/pixel_comparator.h"
 #include "cc/test/pixel_test_utils.h"
 #include "components/viz/common/resources/shared_image_format.h"
@@ -15,6 +16,7 @@
 #include "gpu/command_buffer/service/shared_image/shared_image_manager.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_test_base.h"
 #include "gpu/config/gpu_finch_features.h"
+#include "gpu/vulkan/buildflags.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/gl/gl_context.h"
@@ -39,6 +41,18 @@ class FakeOnScreenSurface : public gl::SurfacelessEGL {
  protected:
   ~FakeOnScreenSurface() override { InvalidateWeakPtrs(); }
 };
+
+#if BUILDFLAG(ENABLE_VULKAN)
+gfx::GpuFenceHandle CreateFenceHandleForStateTest() {
+  base::ScopedFD read_fd;
+  base::ScopedFD write_fd;
+  CHECK(base::CreatePipe(&read_fd, &write_fd,
+                         /*non_blocking=*/false));
+  gfx::GpuFenceHandle fence;
+  fence.Adopt(std::move(read_fd));
+  return fence;
+}
+#endif
 
 }  // namespace
 
@@ -81,6 +95,285 @@ class OzoneImageBackingFactoryTest : public SharedImageTestBase {
       shared_image_representation_factory_;
   std::unique_ptr<OzoneImageBackingFactory> backing_factory_;
 };
+
+#if BUILDFLAG(ENABLE_VULKAN)
+TEST_F(OzoneImageBackingFactoryTest, ScopedVulkanStateRoundTrip) {
+  const Mailbox mailbox = Mailbox::Generate();
+  auto backing =
+      backing_factory_->CreateSharedImage(mailbox,
+                                          {viz::SinglePlaneFormat::kRGBA_8888,
+                                           {100, 100},
+                                           gfx::ColorSpace::CreateSRGB(),
+                                           kTopLeft_GrSurfaceOrigin,
+                                           kPremul_SkAlphaType,
+                                           SHARED_IMAGE_USAGE_WEBGPU_WRITE,
+                                           "ExternalVulkanImageStateTest"},
+                                          gpu::kNullSurfaceHandle, false);
+  ASSERT_TRUE(backing);
+
+  auto* ozone_backing = static_cast<OzoneImageBacking*>(backing.get());
+  auto first_write = ozone_backing->BeginAccess(
+      /*readonly=*/false, OzoneImageBacking::AccessStream::kWebGPU);
+  ASSERT_TRUE(first_write);
+  std::optional<ExternalVulkanImageState> initial_state;
+  EXPECT_TRUE(first_write->TakeExternalVulkanImageState(&initial_state));
+  EXPECT_FALSE(initial_state);
+  first_write->AbortBeforeAcquire();
+
+  const ExternalVulkanImageState producer_state{
+      .old_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      .new_layout = VK_IMAGE_LAYOUT_GENERAL,
+      .external_queue_family = VK_QUEUE_FAMILY_EXTERNAL_KHR,
+  };
+  ozone_backing->external_vulkan_state_ = producer_state;
+  EXPECT_EQ(ozone_backing->external_vulkan_state_, producer_state);
+
+  const ExternalVulkanImageState consumer_state{
+      .old_layout = VK_IMAGE_LAYOUT_GENERAL,
+      .new_layout = VK_IMAGE_LAYOUT_GENERAL,
+      .external_queue_family = VK_QUEUE_FAMILY_EXTERNAL_KHR,
+  };
+  auto first_read = ozone_backing->BeginAccess(
+      /*readonly=*/true, OzoneImageBacking::AccessStream::kWebGPU);
+  ASSERT_TRUE(first_read);
+  EXPECT_TRUE(first_read->TakeBeginFences().empty());
+  std::optional<ExternalVulkanImageState> acquired_state;
+  EXPECT_TRUE(first_read->TakeExternalVulkanImageState(&acquired_state));
+  EXPECT_EQ(acquired_state, producer_state);
+  EXPECT_TRUE(first_read->needs_end_fence());
+  first_read->CommitAcquire();
+  EXPECT_TRUE(first_read->EndVulkan(CreateFenceHandleForStateTest(),
+                                   consumer_state));
+  EXPECT_EQ(ozone_backing->external_vulkan_state_, consumer_state);
+  EXPECT_EQ(ozone_backing->active_accesses_, 0u);
+  EXPECT_FALSE(ozone_backing->vulkan_ownership_in_progress_);
+}
+
+TEST_F(OzoneImageBackingFactoryTest,
+       ScopedVulkanUnusedAccessRestoresState) {
+  const Mailbox mailbox = Mailbox::Generate();
+  auto backing = backing_factory_->CreateSharedImage(
+      mailbox,
+      {viz::SinglePlaneFormat::kRGBA_8888,
+       {100, 100},
+       gfx::ColorSpace::CreateSRGB(),
+       kTopLeft_GrSurfaceOrigin,
+       kPremul_SkAlphaType,
+       SHARED_IMAGE_USAGE_DISPLAY_READ | SHARED_IMAGE_USAGE_SCANOUT |
+           SHARED_IMAGE_USAGE_WEBGPU_READ,
+       "ExternalVulkanUnusedAccessTest"},
+      gpu::kNullSurfaceHandle, false);
+  ASSERT_TRUE(backing);
+
+  auto* ozone_backing = static_cast<OzoneImageBacking*>(backing.get());
+  const ExternalVulkanImageState state{
+      .old_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      .new_layout = VK_IMAGE_LAYOUT_GENERAL,
+      .external_queue_family = VK_QUEUE_FAMILY_EXTERNAL_KHR,
+  };
+  ozone_backing->external_vulkan_state_ = state;
+
+  auto access = ozone_backing->BeginAccess(
+      /*readonly=*/true, OzoneImageBacking::AccessStream::kWebGPU);
+  ASSERT_TRUE(access);
+  EXPECT_TRUE(access->TakeBeginFences().empty());
+  std::optional<ExternalVulkanImageState> acquired_state;
+  EXPECT_TRUE(access->TakeExternalVulkanImageState(&acquired_state));
+  EXPECT_EQ(acquired_state, state);
+  access->CommitAcquire();
+
+  EXPECT_TRUE(access->EndVulkanWithoutGpuUse(gfx::GpuFenceHandle()));
+  EXPECT_EQ(ozone_backing->external_vulkan_state_, state);
+  EXPECT_EQ(ozone_backing->active_accesses_, 0u);
+  EXPECT_FALSE(ozone_backing->vulkan_ownership_in_progress_);
+  EXPECT_FALSE(context_state_->context_lost());
+}
+
+TEST_F(OzoneImageBackingFactoryTest, ScopedAccessAbortRestoresState) {
+  const Mailbox mailbox = Mailbox::Generate();
+  auto backing = backing_factory_->CreateSharedImage(
+      mailbox,
+      {viz::SinglePlaneFormat::kRGBA_8888,
+       {100, 100},
+       gfx::ColorSpace::CreateSRGB(),
+       kTopLeft_GrSurfaceOrigin,
+       kPremul_SkAlphaType,
+       SHARED_IMAGE_USAGE_DISPLAY_WRITE | SHARED_IMAGE_USAGE_SCANOUT |
+           SHARED_IMAGE_USAGE_WEBGPU_WRITE,
+       "ExternalVulkanAbortTest"},
+      gpu::kNullSurfaceHandle, false);
+  ASSERT_TRUE(backing);
+
+  auto* ozone_backing = static_cast<OzoneImageBacking*>(backing.get());
+  const ExternalVulkanImageState state{
+      .old_layout = VK_IMAGE_LAYOUT_GENERAL,
+      .new_layout = VK_IMAGE_LAYOUT_GENERAL,
+      .external_queue_family = VK_QUEUE_FAMILY_EXTERNAL_KHR,
+  };
+  ozone_backing->external_vulkan_state_ = state;
+
+  auto access = ozone_backing->BeginAccess(
+      /*readonly=*/false, OzoneImageBacking::AccessStream::kWebGPU);
+  ASSERT_TRUE(access);
+  std::optional<ExternalVulkanImageState> acquired_state;
+  EXPECT_TRUE(access->TakeExternalVulkanImageState(&acquired_state));
+  EXPECT_EQ(acquired_state, state);
+  EXPECT_FALSE(ozone_backing->external_vulkan_state_);
+
+  access->AbortBeforeAcquire();
+  EXPECT_EQ(ozone_backing->external_vulkan_state_, state);
+  EXPECT_EQ(ozone_backing->active_accesses_, 0u);
+  EXPECT_FALSE(ozone_backing->is_write_in_progress_);
+  EXPECT_FALSE(ozone_backing->vulkan_ownership_in_progress_);
+}
+
+TEST_F(OzoneImageBackingFactoryTest, ImplicitAccessPreservesVulkanState) {
+  const Mailbox mailbox = Mailbox::Generate();
+  auto backing = backing_factory_->CreateSharedImage(
+      mailbox,
+      {viz::SinglePlaneFormat::kRGBA_8888,
+       {100, 100},
+       gfx::ColorSpace::CreateSRGB(),
+       kTopLeft_GrSurfaceOrigin,
+       kPremul_SkAlphaType,
+       SHARED_IMAGE_USAGE_DISPLAY_READ | SHARED_IMAGE_USAGE_SCANOUT,
+       "ImplicitVulkanStateTest"},
+      gpu::kNullSurfaceHandle, false);
+  ASSERT_TRUE(backing);
+
+  auto* ozone_backing = static_cast<OzoneImageBacking*>(backing.get());
+  const ExternalVulkanImageState state{
+      .old_layout = VK_IMAGE_LAYOUT_GENERAL,
+      .new_layout = VK_IMAGE_LAYOUT_GENERAL,
+      .external_queue_family = VK_QUEUE_FAMILY_EXTERNAL_KHR,
+  };
+  ozone_backing->external_vulkan_state_ = state;
+
+  auto access = ozone_backing->BeginAccess(
+      /*readonly=*/true, OzoneImageBacking::AccessStream::kOverlay);
+  ASSERT_TRUE(access);
+  EXPECT_TRUE(access->TakeBeginFences().empty());
+  access->CommitAcquire();
+  access->End(gfx::GpuFenceHandle());
+
+  EXPECT_EQ(ozone_backing->external_vulkan_state_, state);
+  EXPECT_EQ(ozone_backing->active_accesses_, 0u);
+  EXPECT_FALSE(ozone_backing->vulkan_ownership_in_progress_);
+}
+
+TEST_F(OzoneImageBackingFactoryTest, PostAcquireFailureInvalidatesBacking) {
+  const Mailbox mailbox = Mailbox::Generate();
+  auto backing = backing_factory_->CreateSharedImage(
+      mailbox,
+      {viz::SinglePlaneFormat::kRGBA_8888,
+       {100, 100},
+       gfx::ColorSpace::CreateSRGB(),
+       kTopLeft_GrSurfaceOrigin,
+       kPremul_SkAlphaType,
+       SHARED_IMAGE_USAGE_DISPLAY_WRITE | SHARED_IMAGE_USAGE_SCANOUT |
+           SHARED_IMAGE_USAGE_WEBGPU_WRITE,
+       "ExternalVulkanFailureTest"},
+      gpu::kNullSurfaceHandle, false);
+  ASSERT_TRUE(backing);
+
+  auto* ozone_backing = static_cast<OzoneImageBacking*>(backing.get());
+  auto access = ozone_backing->BeginAccess(
+      /*readonly=*/false, OzoneImageBacking::AccessStream::kWebGPU);
+  ASSERT_TRUE(access);
+  EXPECT_TRUE(access->TakeBeginFences().empty());
+  std::optional<ExternalVulkanImageState> state;
+  EXPECT_TRUE(access->TakeExternalVulkanImageState(&state));
+  access->CommitAcquire();
+  access->InvalidateAfterAcquire();
+
+  EXPECT_TRUE(context_state_->context_lost());
+  EXPECT_EQ(ozone_backing->active_accesses_, 0u);
+  EXPECT_FALSE(ozone_backing->vulkan_ownership_in_progress_);
+  EXPECT_FALSE(ozone_backing->external_vulkan_state_);
+}
+
+TEST_F(OzoneImageBackingFactoryTest,
+       BackingDestructionAbandonsExternalVulkanOwnership) {
+  const Mailbox mailbox = Mailbox::Generate();
+  auto backing = backing_factory_->CreateSharedImage(
+      mailbox,
+      {viz::SinglePlaneFormat::kRGBA_8888,
+       {100, 100},
+       gfx::ColorSpace::CreateSRGB(),
+       kTopLeft_GrSurfaceOrigin,
+       kPremul_SkAlphaType,
+       SHARED_IMAGE_USAGE_DISPLAY_WRITE | SHARED_IMAGE_USAGE_SCANOUT |
+           SHARED_IMAGE_USAGE_WEBGPU_WRITE,
+       "ExternalVulkanBackingDestructionTest"},
+      gpu::kNullSurfaceHandle, false);
+  ASSERT_TRUE(backing);
+
+  auto* ozone_backing = static_cast<OzoneImageBacking*>(backing.get());
+  auto access = ozone_backing->BeginAccess(
+      /*readonly=*/false, OzoneImageBacking::AccessStream::kWebGPU);
+  ASSERT_TRUE(access);
+  EXPECT_TRUE(access->TakeBeginFences().empty());
+  std::optional<ExternalVulkanImageState> state;
+  EXPECT_TRUE(access->TakeExternalVulkanImageState(&state));
+  access->CommitAcquire();
+  access->AbandonForBackingDestruction();
+
+  EXPECT_FALSE(context_state_->context_lost());
+  EXPECT_EQ(ozone_backing->active_accesses_, 0u);
+  EXPECT_FALSE(ozone_backing->vulkan_ownership_in_progress_);
+  EXPECT_FALSE(ozone_backing->external_vulkan_state_);
+}
+
+TEST_F(OzoneImageBackingFactoryTest, RejectsConcurrentVulkanOwner) {
+  const Mailbox mailbox = Mailbox::Generate();
+  auto backing = backing_factory_->CreateSharedImage(
+      mailbox,
+      {viz::SinglePlaneFormat::kRGBA_8888,
+       {100, 100},
+       gfx::ColorSpace::CreateSRGB(),
+       kTopLeft_GrSurfaceOrigin,
+       kPremul_SkAlphaType,
+       SHARED_IMAGE_USAGE_DISPLAY_READ | SHARED_IMAGE_USAGE_SCANOUT |
+           SHARED_IMAGE_USAGE_WEBGPU_READ,
+       "ExternalVulkanConcurrentReadTest"},
+      gpu::kNullSurfaceHandle, false);
+  ASSERT_TRUE(backing);
+
+  auto* ozone_backing = static_cast<OzoneImageBacking*>(backing.get());
+  ozone_backing->external_vulkan_state_ = ExternalVulkanImageState{
+      .old_layout = VK_IMAGE_LAYOUT_GENERAL,
+      .new_layout = VK_IMAGE_LAYOUT_GENERAL,
+      .external_queue_family = VK_QUEUE_FAMILY_EXTERNAL_KHR,
+  };
+
+  auto native_read = ozone_backing->BeginAccess(
+      /*readonly=*/true, OzoneImageBacking::AccessStream::kOverlay);
+  auto vulkan_read = ozone_backing->BeginAccess(
+      /*readonly=*/true, OzoneImageBacking::AccessStream::kWebGPU);
+  ASSERT_TRUE(native_read);
+  ASSERT_TRUE(vulkan_read);
+
+  std::optional<ExternalVulkanImageState> state;
+  EXPECT_FALSE(vulkan_read->TakeExternalVulkanImageState(&state));
+  EXPECT_FALSE(state);
+  vulkan_read->AbortBeforeAcquire();
+  native_read->AbortBeforeAcquire();
+  EXPECT_EQ(ozone_backing->active_accesses_, 0u);
+  EXPECT_TRUE(ozone_backing->external_vulkan_state_);
+
+  auto vulkan_owner = ozone_backing->BeginAccess(
+      /*readonly=*/true, OzoneImageBacking::AccessStream::kWebGPU);
+  ASSERT_TRUE(vulkan_owner);
+  EXPECT_TRUE(vulkan_owner->TakeExternalVulkanImageState(&state));
+  EXPECT_TRUE(state);
+  EXPECT_FALSE(ozone_backing->external_vulkan_state_);
+  EXPECT_FALSE(ozone_backing->BeginAccess(
+      /*readonly=*/true, OzoneImageBacking::AccessStream::kOverlay));
+  vulkan_owner->AbortBeforeAcquire();
+  EXPECT_EQ(ozone_backing->active_accesses_, 0u);
+  EXPECT_TRUE(ozone_backing->external_vulkan_state_);
+}
+#endif  // BUILDFLAG(ENABLE_VULKAN)
 
 TEST_F(OzoneImageBackingFactoryTest, UsesCacheForTextureHolders) {
   if (!IsEglImageSupported()) {

@@ -84,6 +84,8 @@ class PlatformWindowSurface;
 
 namespace viz {
 
+struct OffscreenOutputConnection;
+
 class AsyncReadResultHelper;
 class AsyncReadResultLock;
 class ImageContextImpl;
@@ -124,7 +126,8 @@ class SkiaOutputSurfaceImplOnGpu
       ContextLostCallback context_lost_callback,
       ScheduleGpuTaskCallback schedule_gpu_task,
       AddChildWindowToBrowserCallback parent_child_Window_to_browser_callback,
-      SkiaOutputDevice::ReleaseOverlaysCallback release_overlays_callback);
+      SkiaOutputDevice::ReleaseOverlaysCallback release_overlays_callback,
+      std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection);
 
   SkiaOutputSurfaceImplOnGpu(
       base::PassKey<SkiaOutputSurfaceImplOnGpu> pass_key,
@@ -137,7 +140,8 @@ class SkiaOutputSurfaceImplOnGpu
       ContextLostCallback context_lost_callback,
       ScheduleGpuTaskCallback schedule_gpu_task,
       AddChildWindowToBrowserCallback parent_child_window_to_browser_callback,
-      SkiaOutputDevice::ReleaseOverlaysCallback release_overlays_callback);
+      SkiaOutputDevice::ReleaseOverlaysCallback release_overlays_callback,
+      std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection);
 
   SkiaOutputSurfaceImplOnGpu(const SkiaOutputSurfaceImplOnGpu&) = delete;
   SkiaOutputSurfaceImplOnGpu& operator=(const SkiaOutputSurfaceImplOnGpu&) =
@@ -500,6 +504,7 @@ class SkiaOutputSurfaceImplOnGpu
       shared_image_representation_factory_;
   const raw_ptr<VulkanContextProvider> vulkan_context_provider_;
   const RendererSettings renderer_settings_;
+  std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection_;
 
   // Should only be run on the client thread with PostTaskToClientThread().
   DidSwapBufferCompleteCallback did_swap_buffer_complete_callback_;

@@ -12,9 +12,15 @@
 #include <utility>
 #include <vector>
 
+#if defined(__linux__)
+#include <sys/stat.h>
+#endif
+
+#include "base/command_line.h"
 #include "base/compiler_specific.h"
 #include "base/feature_list.h"
 #include "base/logging.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/trace_event/memory_dump_manager.h"
@@ -28,6 +34,7 @@
 #include "gpu/vulkan/vulkan_info.h"
 #include "gpu/vulkan/vulkan_util.h"
 #include "ui/gl/gl_angle_util_vulkan.h"
+#include "ui/gl/gl_switches.h"
 
 namespace gpu {
 namespace {
@@ -105,6 +112,37 @@ bool VulkanDeviceQueue::Initialize(
 
   const VulkanInfo& info = instance_->vulkan_info();
 
+  std::vector<uint8_t> preferred_device_uuid;
+  uint64_t preferred_drm_device_id = 0;
+#if BUILDFLAG(IS_LINUX)
+  const base::CommandLine* command_line =
+      base::CommandLine::ForCurrentProcess();
+  const std::string preferred_device_uuid_string =
+      command_line->GetSwitchValueASCII(switches::kVulkanDeviceUuid);
+  if (!preferred_device_uuid_string.empty() &&
+      (!base::HexStringToBytes(preferred_device_uuid_string,
+                              &preferred_device_uuid) ||
+       preferred_device_uuid.size() != VK_UUID_SIZE)) {
+    LOG(ERROR) << "Invalid Vulkan device UUID; expected exactly "
+                  "32 hexadecimal digits";
+    return false;
+  }
+
+  const std::string preferred_render_node =
+      command_line->GetSwitchValueASCII("render-node-override");
+  if (!preferred_render_node.empty()) {
+    struct stat node_stat {};
+    if (stat(preferred_render_node.c_str(), &node_stat) != 0 ||
+        !S_ISCHR(node_stat.st_mode)) {
+      LOG(ERROR) << "Invalid DRM render node: " << preferred_render_node;
+      return false;
+    }
+    static_assert(sizeof(node_stat.st_rdev) <=
+                  sizeof(preferred_drm_device_id));
+    preferred_drm_device_id = node_stat.st_rdev;
+  }
+#endif
+
   VkResult result = VK_SUCCESS;
 
   VkQueueFlags queue_flags = 0;
@@ -136,6 +174,26 @@ bool VulkanDeviceQueue::Initialize(
   for (size_t i = 0; i < info.physical_devices.size(); ++i) {
     const auto& device_info = info.physical_devices[i];
     const auto& device_properties = device_info.properties;
+#if BUILDFLAG(IS_LINUX)
+    if (preferred_drm_device_id &&
+        device_info.drm_device_id != preferred_drm_device_id) {
+      continue;
+    }
+    if (!preferred_device_uuid.empty()) {
+      VkPhysicalDeviceIDProperties id_properties = {
+          .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES,
+      };
+      VkPhysicalDeviceProperties2 properties2 = {
+          .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+          .pNext = &id_properties,
+      };
+      vkGetPhysicalDeviceProperties2(device_info.device, &properties2);
+      if (std::memcmp(id_properties.deviceUUID,
+                      preferred_device_uuid.data(), VK_UUID_SIZE) != 0) {
+        continue;
+      }
+    }
+#endif
     if (device_properties.apiVersion < info.used_api_version)
       continue;
 
@@ -193,7 +251,8 @@ bool VulkanDeviceQueue::Initialize(
   }
 
   if (device_index == -1) {
-    DLOG(ERROR) << "Cannot find capable device.";
+    LOG(ERROR) << "Cannot find a capable Vulkan device matching the requested "
+                  "DRM render node and UUID.";
     return false;
   }
 

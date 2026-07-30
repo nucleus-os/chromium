@@ -69,6 +69,9 @@ GL_EXPORT extern const char kEnableGPUServiceTracing[];
 GL_EXPORT extern const char kGpuNoContextLost[];
 
 GL_EXPORT extern const char kUseANGLE[];
+// Pins Vulkan consumers to one physical device UUID. This is an internal
+// process-selection value propagated to GPU children, not a renderer fallback.
+GL_EXPORT extern const char kVulkanDeviceUuid[];
 #if BUILDFLAG(USE_STATIC_ANGLE)
 GL_EXPORT extern const char kUseDynamicAngle[];
 #endif

@@ -40,11 +40,13 @@
 #include "components/viz/service/debugger/viz_debugger.h"
 #include "components/viz/service/display/output_surface_frame.h"
 #include "components/viz/service/display_embedder/image_context_impl.h"
+#include "components/viz/service/display_embedder/offscreen_output_connection.h"
 #include "components/viz/service/display_embedder/output_presenter_gl.h"
 #include "components/viz/service/display_embedder/skia_output_device.h"
 #include "components/viz/service/display_embedder/skia_output_device_buffer_queue.h"
 #include "components/viz/service/display_embedder/skia_output_device_gl.h"
 #include "components/viz/service/display_embedder/skia_output_device_offscreen.h"
+#include "components/viz/service/display_embedder/skia_output_device_offscreen_export.h"
 #include "components/viz/service/display_embedder/skia_output_device_webview.h"
 #include "components/viz/service/display_embedder/skia_output_surface_dependency.h"
 #include "components/viz/service/display_embedder/skia_output_surface_impl_on_gpu_debug_capture.h"
@@ -269,7 +271,8 @@ std::unique_ptr<SkiaOutputSurfaceImplOnGpu> SkiaOutputSurfaceImplOnGpu::Create(
     ContextLostCallback context_lost_callback,
     ScheduleGpuTaskCallback schedule_gpu_task,
     AddChildWindowToBrowserCallback add_child_window_to_browser_callback,
-    SkiaOutputDevice::ReleaseOverlaysCallback release_overlays_callback) {
+    SkiaOutputDevice::ReleaseOverlaysCallback release_overlays_callback,
+    std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection) {
   TRACE_EVENT0("viz", "SkiaOutputSurfaceImplOnGpu::Create");
 
   auto context_state = deps->GetSharedContextState();
@@ -294,7 +297,8 @@ std::unique_ptr<SkiaOutputSurfaceImplOnGpu> SkiaOutputSurfaceImplOnGpu::Create(
       std::move(buffer_presented_callback), std::move(context_lost_callback),
       std::move(schedule_gpu_task),
       std::move(add_child_window_to_browser_callback),
-      std::move(release_overlays_callback));
+      std::move(release_overlays_callback),
+      std::move(offscreen_output_connection));
   if (!impl_on_gpu->Initialize()) {
     return nullptr;
   }
@@ -313,7 +317,8 @@ SkiaOutputSurfaceImplOnGpu::SkiaOutputSurfaceImplOnGpu(
     ContextLostCallback context_lost_callback,
     ScheduleGpuTaskCallback schedule_gpu_task,
     AddChildWindowToBrowserCallback add_child_window_to_browser_callback,
-    SkiaOutputDevice::ReleaseOverlaysCallback release_overlays_callback)
+    SkiaOutputDevice::ReleaseOverlaysCallback release_overlays_callback,
+    std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection)
     : dependency_(std::move(deps)),
       shared_gpu_deps_(shared_gpu_deps),
       feature_info_(std::move(feature_info)),
@@ -326,6 +331,7 @@ SkiaOutputSurfaceImplOnGpu::SkiaOutputSurfaceImplOnGpu(
               shared_gpu_deps_->memory_tracker())),
       vulkan_context_provider_(dependency_->GetVulkanContextProvider()),
       renderer_settings_(renderer_settings),
+      offscreen_output_connection_(std::move(offscreen_output_connection)),
       did_swap_buffer_complete_callback_(
           std::move(did_swap_buffer_complete_callback)),
       context_lost_callback_(std::move(context_lost_callback)),
@@ -1982,6 +1988,10 @@ bool SkiaOutputSurfaceImplOnGpu::Initialize() {
 
 bool SkiaOutputSurfaceImplOnGpu::InitializeForGL() {
   if (dependency_->IsOffscreen()) {
+    if (offscreen_output_connection_) {
+      LOG(FATAL) << "Exportable offscreen output cannot use Ganesh/GL";
+      return false;
+    }
     output_device_ = std::make_unique<SkiaOutputDeviceOffscreen>(
         context_state_, gfx::SurfaceOrigin::kTopLeft,
         renderer_settings_.requires_alpha_channel,
@@ -2072,6 +2082,10 @@ bool SkiaOutputSurfaceImplOnGpu::InitializeForGL() {
 #if BUILDFLAG(ENABLE_VULKAN)
 bool SkiaOutputSurfaceImplOnGpu::InitializeForVulkan() {
   if (dependency_->IsOffscreen()) {
+    if (offscreen_output_connection_) {
+      LOG(FATAL) << "Exportable offscreen output cannot use Ganesh/Vulkan";
+      return false;
+    }
     output_device_ = std::make_unique<SkiaOutputDeviceOffscreen>(
         context_state_, gfx::SurfaceOrigin::kBottomLeft,
         renderer_settings_.requires_alpha_channel,
@@ -2156,6 +2170,19 @@ bool SkiaOutputSurfaceImplOnGpu::InitializeForVulkan() {
 bool SkiaOutputSurfaceImplOnGpu::InitializeForDawn() {
 #if BUILDFLAG(SKIA_USE_DAWN)
   if (dependency_->IsOffscreen()) {
+    if (offscreen_output_connection_) {
+      if (!context_state_->IsGraphiteDawnVulkan()) {
+        LOG(FATAL) << "Exportable offscreen output requires "
+                      "Graphite/Dawn/Vulkan";
+        return false;
+      }
+      output_device_ = std::make_unique<SkiaOutputDeviceOffscreenExport>(
+          context_state_, shared_gpu_deps_->memory_tracker(),
+          GetDidSwapBuffersCompleteCallback(), shared_image_factory_.get(),
+          shared_image_representation_factory_.get(),
+          std::move(offscreen_output_connection_));
+      return true;
+    }
     output_device_ = std::make_unique<SkiaOutputDeviceOffscreen>(
         context_state_, gfx::SurfaceOrigin::kBottomLeft,
         renderer_settings_.requires_alpha_channel,

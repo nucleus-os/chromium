@@ -9,6 +9,7 @@
 #include <dawn/webgpu_cpp.h>
 
 #include <memory>
+#include <optional>
 
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
@@ -77,6 +78,27 @@ class NativePixmap;
 namespace gpu {
 class SharedImageManager;
 class TextureBase;
+
+#if BUILDFLAG(ENABLE_VULKAN)
+// The exact layout transition used by one side of an external Vulkan
+// queue-family ownership transfer. The importing side must use the same pair
+// in its matching ownership-acquire barrier.
+struct GPU_GLES2_EXPORT ExternalVulkanImageState {
+  VkImageLayout old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  VkImageLayout new_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  uint32_t external_queue_family = VK_QUEUE_FAMILY_IGNORED;
+
+  bool IsValid() const {
+    return old_layout != VK_IMAGE_LAYOUT_UNDEFINED &&
+           old_layout != VK_IMAGE_LAYOUT_PREINITIALIZED &&
+           new_layout != VK_IMAGE_LAYOUT_UNDEFINED &&
+           new_layout != VK_IMAGE_LAYOUT_PREINITIALIZED &&
+           external_queue_family != VK_QUEUE_FAMILY_IGNORED;
+  }
+
+  bool operator==(const ExternalVulkanImageState&) const = default;
+};
+#endif  // BUILDFLAG(ENABLE_VULKAN)
 
 namespace gles2 {
 class Texture;
@@ -986,6 +1008,21 @@ class GPU_GLES2_EXPORT OverlayImageRepresentation
     scoped_refptr<gfx::NativePixmap> GetNativePixmap() {
       return representation()->GetNativePixmap();
     }
+#if BUILDFLAG(ENABLE_VULKAN)
+    bool TakeExternalVulkanImageState(
+        std::optional<ExternalVulkanImageState>* state) {
+      return representation()->TakeExternalVulkanImageState(state);
+    }
+    bool SetReleaseExternalVulkanImageState(
+        ExternalVulkanImageState release_state) {
+      return representation()->SetReleaseExternalVulkanImageState(
+          release_state);
+    }
+    // Ends an externally owned Vulkan access without returning ownership when
+    // the backing is about to be destroyed. The caller must destroy the
+    // backing immediately after this access object is released.
+    bool AbandonExternalVulkanAccessForBackingDestruction();
+#endif  // BUILDFLAG(ENABLE_VULKAN)
 #elif BUILDFLAG(IS_WIN)
     std::optional<gl::DCLayerOverlayImage> GetDCLayerOverlayImage() {
       return representation()->GetDCLayerOverlayImage();
@@ -1002,7 +1039,22 @@ class GPU_GLES2_EXPORT OverlayImageRepresentation
     }
 #endif
 
-    gfx::GpuFenceHandle TakeAcquireFence() { return std::move(acquire_fence_); }
+    gfx::GpuFenceHandle CloneAcquireFence() const {
+      return acquire_fence_.Clone();
+    }
+    void CommitReadAccess() {
+      if (read_access_committed_) {
+        return;
+      }
+      representation()->CommitReadAccess();
+      acquire_fence_ = gfx::GpuFenceHandle();
+      read_access_committed_ = true;
+    }
+    gfx::GpuFenceHandle TakeAcquireFence() {
+      gfx::GpuFenceHandle fence = std::move(acquire_fence_);
+      CommitReadAccess();
+      return fence;
+    }
     void SetReleaseFence(gfx::GpuFenceHandle release_fence) {
       // Note: We overwrite previous fence. In case if window manager uses fence
       // for each frame we schedule overlay and the same image is scheduled for
@@ -1014,6 +1066,8 @@ class GPU_GLES2_EXPORT OverlayImageRepresentation
    private:
     gfx::GpuFenceHandle acquire_fence_;
     gfx::GpuFenceHandle release_fence_;
+    bool read_access_committed_ = false;
+    bool access_abandoned_ = false;
   };
 
   std::unique_ptr<ScopedReadAccess> BeginScopedReadAccess();
@@ -1027,6 +1081,7 @@ class GPU_GLES2_EXPORT OverlayImageRepresentation
   // SharedImage is ready to be displayed. This fence is fired when the gpu
   // has finished writing.
   virtual bool BeginReadAccess(gfx::GpuFenceHandle& acquire_fence) = 0;
+  virtual void CommitReadAccess() {}
 
   // |release_fence| is a fence that will be signaled when the image can be
   // safely re-used. Note, on some platforms window manager doesn't support
@@ -1040,6 +1095,13 @@ class GPU_GLES2_EXPORT OverlayImageRepresentation
   GetAHardwareBufferFenceSync();
 #elif BUILDFLAG(IS_OZONE)
   scoped_refptr<gfx::NativePixmap> GetNativePixmap();
+#if BUILDFLAG(ENABLE_VULKAN)
+  virtual bool TakeExternalVulkanImageState(
+      std::optional<ExternalVulkanImageState>* state);
+  virtual bool SetReleaseExternalVulkanImageState(
+      ExternalVulkanImageState release_state);
+  virtual bool AbandonExternalVulkanAccessForBackingDestruction();
+#endif  // BUILDFLAG(ENABLE_VULKAN)
 #elif BUILDFLAG(IS_WIN)
   virtual std::optional<gl::DCLayerOverlayImage> GetDCLayerOverlayImage();
 #elif BUILDFLAG(IS_APPLE)

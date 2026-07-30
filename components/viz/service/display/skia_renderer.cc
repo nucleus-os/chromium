@@ -86,6 +86,7 @@
 #include "third_party/skia/include/effects/SkShaderMaskFilter.h"
 #include "third_party/skia/include/gpu/ganesh/GrBackendSurface.h"
 #include "third_party/skia/include/gpu/ganesh/GrDirectContext.h"
+#include "third_party/skia/include/pathops/SkPathOps.h"
 #include "third_party/skia/include/private/chromium/GrDeferredDisplayList.h"
 #include "third_party/skia/modules/skcms/skcms.h"
 #include "third_party/skia/src/core/SkCanvasPriv.h"
@@ -876,6 +877,10 @@ struct SkiaRenderer::DrawRPDQParams {
   // Backdrop border box for the render pass, to clip backdrop-filtered content
   // (but not the rest of the RPDQ itself).
   std::optional<SkPath> backdrop_filter_bounds;
+  // Exact local-coordinate region whose captured backdrop may be consumed for
+  // externally composited transparent output. Unlike filter_bounds, this
+  // never includes foreground-filter expansion.
+  std::optional<SkPath> backdrop_replacement_bounds;
   // Original render pass's visible rect, which will be intersected with
   // |backdrop_filter_bounds| to determine the extent of backdrop content.
   // It is preserved here as the original DrawQuad's |visible_rect| may be
@@ -926,6 +931,9 @@ struct SkiaRenderer::DrawRPDQParams {
   // impacting the DrawQuad or regular filter output.
   void ClearOutsideBackdropBounds(SkCanvas* canvas,
                                   const DrawQuadParams* params) const;
+
+  std::optional<SkPath> BackdropReplacementPath(
+      const DrawQuadParams* params) const;
 };
 
 sk_sp<SkShader> SkiaRenderer::DrawRPDQParams::MaskShader::GetOrCreateSkShader(
@@ -1010,6 +1018,43 @@ void SkiaRenderer::DrawRPDQParams::ClearOutsideBackdropBounds(
       canvas->restore();
     }
   }
+}
+
+std::optional<SkPath> SkiaRenderer::DrawRPDQParams::BackdropReplacementPath(
+    const DrawQuadParams* params) const {
+  if (!backdrop_filter || !backdrop_replacement_bounds) {
+    return std::nullopt;
+  }
+
+  auto intersect = [](const SkPath& first,
+                      const SkPath& second) -> std::optional<SkPath> {
+    SkRect first_rect;
+    SkRect second_rect;
+    if (first.isRect(&first_rect) && second.isRect(&second_rect)) {
+      if (!first_rect.intersect(second_rect) || first_rect.isEmpty()) {
+        return std::nullopt;
+      }
+      return SkPath::Rect(first_rect);
+    }
+
+    SkPath result;
+    if (!Op(first, second, kIntersect_SkPathOp, &result) || result.isEmpty()) {
+      return std::nullopt;
+    }
+    return result;
+  };
+
+  std::optional<SkPath> replacement =
+      intersect(*backdrop_replacement_bounds, SkPath::Rect(rpdq_visible_rect));
+  if (!replacement || !params->draw_region) {
+    return replacement;
+  }
+
+  SkPath draw_region = params->draw_region_in_path();
+  if (bypass_geometry) {
+    draw_region = draw_region.makeTransform(bypass_geometry->transform);
+  }
+  return intersect(*replacement, draw_region);
 }
 
 // A read lock based fence that is signaled after gpu commands are completed
@@ -1782,9 +1827,21 @@ void SkiaRenderer::PrepareCanvasForRPDQ(const DrawRPDQParams& rpdq_params,
       gfx::RectFToSkRect(rpdq_params.bypass_geometry.has_value()
                              ? rpdq_params.bypass_geometry->clip_rect
                              : params->visible_rect);
-  current_canvas_->saveLayer(SkCanvasPriv::ScaledBackdropLayer(
+  SkCanvas::SaveLayerRec layer_rec = SkCanvasPriv::ScaledBackdropLayer(
       &bounds, &layer_paint, rpdq_params.backdrop_filter.get(),
-      rpdq_params.backdrop_filter_quality, 0));
+      rpdq_params.backdrop_filter_quality, 0);
+  std::optional<SkPath> backdrop_replacement;
+  if (rpdq_params.backdrop_filter &&
+      output_surface_->capabilities().backdrop_filters_replace_destination &&
+      current_frame()->root_render_pass->has_transparent_background) {
+    backdrop_replacement = rpdq_params.BackdropReplacementPath(params);
+    if (backdrop_replacement) {
+      layer_rec.fBackdropReplacement = &*backdrop_replacement;
+      layer_rec.fBackdropReplacementAA =
+          params->aa_flags != SkCanvas::kNone_QuadAAFlags;
+    }
+  }
+  current_canvas_->saveLayer(layer_rec);
 
   // If we have backdrop filtered content (and not transparent black like with
   // regular render passes), we have to clear out the parts of the layer that
@@ -3316,6 +3373,9 @@ SkiaRenderer::DrawRPDQParams SkiaRenderer::CalculateRPDQParams(
     // with some pixel-moving filters, that may not remain the case and this
     // ensures |filter_bounds| will contain all possible output.
     rpdq_params.filter_bounds.join(bd_filter_extra_bounds);
+    rpdq_params.backdrop_replacement_bounds = backdrop_filter_bounds
+                                                  ? *backdrop_filter_bounds
+                                                  : SkPath::Rect(backdrop_rect);
     rpdq_params.backdrop_filter_bounds = backdrop_filter_bounds;
   }
 

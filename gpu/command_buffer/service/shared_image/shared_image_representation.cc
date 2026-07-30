@@ -749,7 +749,7 @@ SkiaGraphiteImageRepresentation::ScopedGraphiteReadAccess::CreateSkImage(
       CreateGraphiteSkImageReleaseProc(texture_release_proc, release_context,
                                        graphite_texture_holders_);
 
-  if (format.is_single_plane() || format.PrefersExternalSampler()) {
+  if (format.is_single_plane() || GraphiteDawnUsesExternalSampler(format)) {
     CHECK_EQ(static_cast<int>(graphite_texture_holders_.size()), 1);
     auto alpha_type = representation()->alpha_type();
     auto color_type = format.PrefersExternalSampler()
@@ -923,6 +923,23 @@ OverlayImageRepresentation::GetAHardwareBufferFenceSync() {
 scoped_refptr<gfx::NativePixmap> OverlayImageRepresentation::GetNativePixmap() {
   return backing()->GetNativePixmap();
 }
+#if BUILDFLAG(ENABLE_VULKAN)
+bool OverlayImageRepresentation::TakeExternalVulkanImageState(
+    std::optional<ExternalVulkanImageState>* state) {
+  *state = std::nullopt;
+  return false;
+}
+
+bool OverlayImageRepresentation::SetReleaseExternalVulkanImageState(
+    ExternalVulkanImageState /*release_state*/) {
+  return false;
+}
+
+bool OverlayImageRepresentation::
+    AbandonExternalVulkanAccessForBackingDestruction() {
+  return false;
+}
+#endif  // BUILDFLAG(ENABLE_VULKAN)
 #elif BUILDFLAG(IS_WIN)
 std::optional<gl::DCLayerOverlayImage>
 OverlayImageRepresentation::GetDCLayerOverlayImage() {
@@ -949,8 +966,31 @@ OverlayImageRepresentation::ScopedReadAccess::ScopedReadAccess(
       acquire_fence_(std::move(acquire_fence)) {}
 
 OverlayImageRepresentation::ScopedReadAccess::~ScopedReadAccess() {
-  representation()->EndReadAccess(std::move(release_fence_));
+  if (!access_abandoned_) {
+    representation()->EndReadAccess(std::move(release_fence_));
+  }
 }
+
+#if BUILDFLAG(IS_OZONE) && BUILDFLAG(ENABLE_VULKAN)
+bool OverlayImageRepresentation::ScopedReadAccess::
+    AbandonExternalVulkanAccessForBackingDestruction() {
+  // A read that never consumed its acquire fence has not transferred Vulkan
+  // ownership. Let the normal destructor call EndReadAccess(), which performs
+  // the representation's pre-acquire abort path.
+  if (!read_access_committed_) {
+    return true;
+  }
+  if (access_abandoned_ ||
+      !representation()
+           ->AbandonExternalVulkanAccessForBackingDestruction()) {
+    return false;
+  }
+  acquire_fence_ = gfx::GpuFenceHandle();
+  release_fence_ = gfx::GpuFenceHandle();
+  access_abandoned_ = true;
+  return true;
+}
+#endif
 
 std::unique_ptr<OverlayImageRepresentation::ScopedReadAccess>
 OverlayImageRepresentation::BeginScopedReadAccess() {

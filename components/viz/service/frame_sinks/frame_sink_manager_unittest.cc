@@ -29,6 +29,7 @@
 #include "components/viz/test/test_output_surface_provider.h"
 #include "mojo/public/cpp/bindings/associated_remote.h"
 #include "mojo/public/cpp/bindings/remote.h"
+#include "services/viz/privileged/mojom/compositing/offscreen_output.mojom.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/perfetto/include/perfetto/tracing/tracing.h"
 
@@ -291,6 +292,41 @@ TEST_F(FrameSinkManagerTest, CreateRootCompositorFrameSink) {
   // Invalidating should destroy the RootCompositorFrameSinkImpl.
   manager_->InvalidateFrameSinkId(kFrameSinkIdRoot, {});
   EXPECT_FALSE(CompositorFrameSinkExists(kFrameSinkIdRoot));
+}
+
+TEST_F(FrameSinkManagerTest, CreateRootWithPairedOffscreenOutputEndpoints) {
+  RootCompositorFrameSinkData root_data;
+  auto params = root_data.BuildParams(kFrameSinkIdRoot);
+
+  mojo::PendingRemote<mojom::OffscreenOutputClient> client;
+  [[maybe_unused]] auto client_receiver =
+      client.InitWithNewPipeAndPassReceiver();
+  mojo::Remote<mojom::OffscreenOutput> output;
+  params->offscreen_output_client = std::move(client);
+  params->offscreen_output = output.BindNewPipeAndPassReceiver();
+
+  manager_->CreateRootCompositorFrameSink(std::move(params));
+
+  EXPECT_TRUE(CompositorFrameSinkExists(kFrameSinkIdRoot));
+  EXPECT_TRUE(output_surface_provider_.last_output_had_offscreen_connection());
+
+  manager_->InvalidateFrameSinkId(kFrameSinkIdRoot, {});
+  EXPECT_FALSE(CompositorFrameSinkExists(kFrameSinkIdRoot));
+}
+
+TEST_F(FrameSinkManagerTest, RejectsUnpairedOffscreenOutputEndpoints) {
+  RootCompositorFrameSinkData root_data;
+  auto params = root_data.BuildParams(kFrameSinkIdRoot);
+
+  mojo::PendingRemote<mojom::OffscreenOutputClient> client;
+  [[maybe_unused]] auto client_receiver =
+      client.InitWithNewPipeAndPassReceiver();
+  params->offscreen_output_client = std::move(client);
+
+  manager_->CreateRootCompositorFrameSink(std::move(params));
+
+  EXPECT_FALSE(CompositorFrameSinkExists(kFrameSinkIdRoot));
+  EXPECT_FALSE(output_surface_provider_.last_output_had_offscreen_connection());
 }
 
 TEST_F(FrameSinkManagerTest, InputManagerCreation) {

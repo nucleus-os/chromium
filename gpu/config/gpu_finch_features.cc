@@ -375,7 +375,7 @@ const base::FeatureParam<std::string> kDrDcBlockListByAndroidBuildFP{
 // --disable-skia-graphite which take precedence over the feature flag, and the
 // Dawn backend can be overridden with the --skia-graphite-dawn-backend flag.
 BASE_FEATURE(kSkiaGraphite,
-#if BUILDFLAG(IS_APPLE)
+#if BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX)
              base::FEATURE_ENABLED_BY_DEFAULT
 #else
              base::FEATURE_DISABLED_BY_DEFAULT
@@ -423,7 +423,7 @@ BASE_FEATURE(kSkiaGraphitePrecompilation, base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Whether to use PersistentCache for Skia Graphite's pipeline cache.
 BASE_FEATURE(kSkiaGraphiteUsePersistentCache,
-#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
              base::FEATURE_ENABLED_BY_DEFAULT
 #else
              base::FEATURE_DISABLED_BY_DEFAULT
@@ -596,6 +596,11 @@ bool IsSkiaGraphiteSupportedByDevice(const base::CommandLine* command_line) {
   // Graphite on ChromeOS uses the Dawn Vulkan backend. Only enable Graphite if
   // device would already be using Ganesh/Vulkan.
   return IsUsingVulkan();
+#elif BUILDFLAG(IS_LINUX)
+  // The required Linux compositor is Graphite on Dawn Vulkan. Runtime adapter
+  // and external-memory validation determine whether startup can continue;
+  // Linux is not gated on the legacy Ganesh/Vulkan feature.
+  return true;
 #elif BUILDFLAG(IS_WIN) && defined(ARCH_CPU_ARM64)
   // Graphite on Windows ARM requires further research.
   return false;

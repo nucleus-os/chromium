@@ -20,6 +20,7 @@ namespace viz {
 
 struct DebugRendererSettings;
 class DisplayCompositorMemoryAndTaskController;
+struct OffscreenOutputConnection;
 class RendererSettings;
 class OutputSurface;
 
@@ -43,7 +44,9 @@ class OutputSurfaceProvider {
       DisplayCompositorMemoryAndTaskController* gpu_dependency,
       const RendererSettings& renderer_settings,
       const DebugRendererSettings* debug_settings,
-      bool use_proxy_output_device) = 0;
+      bool use_proxy_output_device,
+      std::unique_ptr<OffscreenOutputConnection>
+          offscreen_output_connection) = 0;
 
   virtual gpu::SharedImageManager* GetSharedImageManager() = 0;
   virtual gpu::SyncPointManager* GetSyncPointManager() = 0;

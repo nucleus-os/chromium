@@ -23,6 +23,7 @@
 #include "components/viz/common/features.h"
 #include "components/viz/common/frame_sinks/begin_frame_source.h"
 #include "components/viz/service/display/display_compositor_memory_and_task_controller.h"
+#include "components/viz/service/display_embedder/offscreen_output_connection.h"
 #include "components/viz/service/display_embedder/skia_output_surface_dependency_impl.h"
 #include "components/viz/service/display_embedder/skia_output_surface_impl.h"
 #include "components/viz/service/display_embedder/software_output_surface.h"
@@ -95,13 +96,17 @@ std::unique_ptr<OutputSurface> OutputSurfaceProviderImpl::CreateOutputSurface(
     DisplayCompositorMemoryAndTaskController* gpu_dependency,
     const RendererSettings& renderer_settings,
     const DebugRendererSettings* debug_settings,
-    bool use_proxy_output_device) {
+    bool use_proxy_output_device,
+    std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection) {
 #if BUILDFLAG(IS_CHROMEOS)
   if (surface_handle == gpu::kNullSurfaceHandle)
     return std::make_unique<OutputSurfaceUnified>();
 #endif
 
   if (!gpu_compositing) {
+    if (offscreen_output_connection) {
+      return nullptr;
+    }
     return std::make_unique<SoftwareOutputSurface>(
         CreateSoftwareOutputDeviceForPlatform(surface_handle, display_client,
                                               use_proxy_output_device));
@@ -113,7 +118,8 @@ std::unique_ptr<OutputSurface> OutputSurfaceProviderImpl::CreateOutputSurface(
     {
       gpu::ScopedAllowScheduleGpuTask allow_schedule_gpu_task;
       output_surface = SkiaOutputSurfaceImpl::Create(
-          gpu_dependency, renderer_settings, debug_settings);
+          gpu_dependency, renderer_settings, debug_settings,
+          std::move(offscreen_output_connection));
     }
 
 #if BUILDFLAG(IS_ANDROID)

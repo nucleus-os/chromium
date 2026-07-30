@@ -65,6 +65,7 @@ class Recording;
 namespace viz {
 
 class ImageContextImpl;
+struct OffscreenOutputConnection;
 class SkiaOutputSurfaceDependency;
 class SkiaOutputSurfaceImplOnGpu;
 class SkiaOutputSurfaceSharedImageInterface;
@@ -85,12 +86,18 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
       DisplayCompositorMemoryAndTaskController* display_controller,
       const RendererSettings& renderer_settings,
       const DebugRendererSettings* debug_settings);
+  static std::unique_ptr<SkiaOutputSurface> Create(
+      DisplayCompositorMemoryAndTaskController* display_controller,
+      const RendererSettings& renderer_settings,
+      const DebugRendererSettings* debug_settings,
+      std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection);
 
   SkiaOutputSurfaceImpl(
       base::PassKey<SkiaOutputSurfaceImpl> pass_key,
       DisplayCompositorMemoryAndTaskController* display_controller,
       const RendererSettings& renderer_settings,
-      const DebugRendererSettings* debug_settings);
+      const DebugRendererSettings* debug_settings,
+      std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection);
   ~SkiaOutputSurfaceImpl() override;
 
   SkiaOutputSurfaceImpl(const SkiaOutputSurfaceImpl&) = delete;
@@ -191,7 +198,9 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
 
   // Set the fields of |capabilities_| and propagates to |impl_on_gpu_|. Should
   // be called after BindToClient().
-  void SetCapabilitiesForTesting(gfx::SurfaceOrigin output_surface_origin);
+  void SetCapabilitiesForTesting(
+      gfx::SurfaceOrigin output_surface_origin,
+      bool backdrop_filters_replace_destination = false);
 
   // Used in unit tests.
   void ScheduleGpuTaskForTesting(
@@ -295,6 +304,7 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
 
   scoped_refptr<SkiaOutputSurfaceSharedImageInterface> shared_image_interface_;
   raw_ptr<SkiaOutputSurfaceDependency> dependency_;
+  std::unique_ptr<OffscreenOutputConnection> offscreen_output_connection_;
   UpdateVSyncParametersCallback update_vsync_parameters_callback_;
 
   gfx::Size size_;

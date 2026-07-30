@@ -18,7 +18,7 @@
 #include "ui/gl/gl_angle_util_vulkan.h"
 #include "ui/gl/gl_switches.h"
 
-#if BUILDFLAG(IS_CHROMEOS)
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
 #include <sys/sysmacros.h>
 #endif
 
@@ -458,7 +458,7 @@ bool VulkanInstance::CollectDeviceInfo(VkPhysicalDevice physical_device) {
       };
       vkGetPhysicalDeviceProperties2(device, &properties2);
 
-#if BUILDFLAG(IS_CHROMEOS)
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
       if (has_drm_extension &&
           (drm_properties.hasRender || drm_properties.hasPrimary)) {
         static_assert(sizeof(dev_t) <= sizeof(info.drm_device_id),

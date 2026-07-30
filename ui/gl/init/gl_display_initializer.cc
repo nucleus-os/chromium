@@ -82,6 +82,12 @@ void GetEGLInitDisplays(bool supports_angle,
 
   if (supports_angle_vulkan && use_angle_default && default_angle_vulkan) {
     AddInitDisplay(init_displays, ANGLE_VULKAN);
+#if BUILDFLAG(IS_LINUX)
+    // Use ANGLE's Vulkan backend for WebGL and interop. Do not append
+    // OpenGL/GLES alternatives that would silently split the browser across
+    // incompatible GPU APIs after Vulkan initialization fails.
+    return;
+#endif
   }
 
   if (supports_angle_d3d) {

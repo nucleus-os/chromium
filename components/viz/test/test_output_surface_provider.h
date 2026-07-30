@@ -33,10 +33,18 @@ class TestOutputSurfaceProvider : public OutputSurfaceProvider {
       DisplayCompositorMemoryAndTaskController* display_controller,
       const RendererSettings& renderer_settings,
       const DebugRendererSettings* debug_settings,
-      bool use_proxy_output_device) override;
+      bool use_proxy_output_device,
+      std::unique_ptr<OffscreenOutputConnection>
+          offscreen_output_connection) override;
   gpu::SharedImageManager* GetSharedImageManager() override;
   gpu::SyncPointManager* GetSyncPointManager() override;
   gpu::Scheduler* GetGpuScheduler() override;
+  bool last_output_had_offscreen_connection() const {
+    return last_output_had_offscreen_connection_;
+  }
+
+ private:
+  bool last_output_had_offscreen_connection_ = false;
 };
 
 }  // namespace viz

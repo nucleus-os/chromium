@@ -39,9 +39,11 @@
 #include "components/viz/host/host_frame_sink_client.h"
 #include "components/viz/service/display/software_output_device.h"
 #include "mojo/public/cpp/bindings/associated_remote.h"
+#include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "services/viz/privileged/mojom/compositing/display_private.mojom.h"
 #include "services/viz/privileged/mojom/compositing/external_begin_frame_controller.mojom.h"
+#include "services/viz/privileged/mojom/compositing/offscreen_output.mojom.h"
 #include "services/viz/privileged/mojom/compositing/vsync_parameter_observer.mojom-forward.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkM44.h"
@@ -153,6 +155,15 @@ class COMPOSITOR_EXPORT CompositorDelegate {
  public:
   virtual std::unique_ptr<viz::HostDisplayClient> CreateHostDisplayClient() = 0;
   virtual bool UseProxyOutputDevice() = 0;
+
+  // Optionally creates the paired browser/Viz endpoints for an exportable
+  // offscreen root. Ordinary compositors leave this disabled. Implementations
+  // must initialize both endpoints before returning true.
+  virtual bool CreateOffscreenOutputEndpoints(
+      mojo::PendingRemote<viz::mojom::OffscreenOutputClient>* client,
+      mojo::PendingReceiver<viz::mojom::OffscreenOutput>* output) {
+    return false;
+  }
 
  protected:
   virtual ~CompositorDelegate() {}
@@ -386,6 +397,7 @@ class COMPOSITOR_EXPORT Compositor
       const viz::BeginFrameArgs& args,
       base::OnceCallback<void(const viz::BeginFrameAck&)> callback);
 #endif
+  bool AbortPendingExternalBeginFrame();
 
   // Creates a CompositorMetricsTracker for tracking this Compositor.
   CompositorMetricsTracker RequestNewCompositorMetricsTracker();

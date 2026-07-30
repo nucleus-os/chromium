@@ -7,6 +7,8 @@
 #include <content-type-v1-client-protocol.h>
 #include <extended-drag-unstable-v1-client-protocol.h>
 #include <presentation-time-client-protocol.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <xdg-shell-client-protocol.h>
 
 #include <cstdint>
@@ -17,6 +19,7 @@
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/posix/eintr_wrapper.h"
 #include "base/strings/string_util.h"
 #include "base/system/sys_info.h"
 #include "base/trace_event/trace_event.h"
@@ -30,6 +33,7 @@
 #include "ui/gfx/linux/scoped_gbm_device.h"
 #include "ui/ozone/common/features.h"
 #include "ui/ozone/platform/wayland/common/wayland_util.h"
+#include "ui/ozone/platform/wayland/host/drm_syncobj_ioctl_wrapper.h"
 #include "ui/ozone/platform/wayland/host/fractional_scale_manager.h"
 #include "ui/ozone/platform/wayland/host/gtk_primary_selection_device_manager.h"
 #include "ui/ozone/platform/wayland/host/org_kde_kwin_appmenu.h"
@@ -253,6 +257,11 @@ bool WaylandConnection::Initialize(bool use_threaded_polling) {
   }
 
   buffer_manager_host_ = std::make_unique<WaylandBufferManagerHost>(this);
+  if (compositor_drm_render_node_fd_.is_valid()) {
+    buffer_manager_host_->SetDrmSyncobjWrapper(
+        std::make_unique<DrmSyncobjIoctlWrapper>(
+            std::move(compositor_drm_render_node_fd_)));
+  }
 
   if (!compositor_) {
     LOG(ERROR) << "No wl_compositor object";
@@ -792,17 +801,45 @@ struct wl_registry* WaylandConnection::GetRegistry() {
 
 void WaylandConnection::SetRenderNodePath(base::ScopedFD& drm_fd,
                                           const char* render_node_path) {
-  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kRenderNodeOverride)) {
-    TRACE_EVENT("wayland", "scoped attempt of gbm_create_device");
-    if (drm_fd.is_valid()) {
-      ScopedGbmDevice gbm_device(gbm_create_device(drm_fd.get()));
-      if (gbm_device) {
-        base::CommandLine::ForCurrentProcess()->AppendSwitchASCII(
-            switches::kRenderNodeOverride, render_node_path);
-      }
-    }
+  struct stat compositor_stat{};
+  CHECK(drm_fd.is_valid() && fstat(drm_fd.get(), &compositor_stat) == 0 &&
+        S_ISCHR(compositor_stat.st_mode))
+      << "Invalid compositor DRM render node";
+  const uint64_t compositor_device_id = compositor_stat.st_rdev;
+  if (compositor_drm_device_id_) {
+    CHECK_EQ(compositor_drm_device_id_, compositor_device_id)
+        << "Wayland main_device changed during the browser GPU epoch";
+    return;
   }
+
+  CHECK(!buffer_manager_host_)
+      << "Initial Wayland main_device arrived after buffer-manager "
+         "initialization";
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  TRACE_EVENT("wayland", "scoped attempt of gbm_create_device");
+  ScopedGbmDevice gbm_device(gbm_create_device(drm_fd.get()));
+  CHECK(gbm_device) << "Cannot create a GBM device for Wayland main_device";
+
+  if (command_line->HasSwitch(switches::kRenderNodeOverride)) {
+    const base::FilePath requested =
+        command_line->GetSwitchValuePath(switches::kRenderNodeOverride);
+    struct stat requested_stat{};
+    CHECK(!requested.empty() &&
+          stat(requested.value().c_str(), &requested_stat) == 0 &&
+          S_ISCHR(requested_stat.st_mode))
+        << "Invalid DRM render-node selection";
+    CHECK_EQ(requested_stat.st_rdev, compositor_stat.st_rdev)
+        << "Requested DRM render node does not match Wayland dma-buf "
+           "feedback";
+  } else {
+    command_line->AppendSwitchASCII(switches::kRenderNodeOverride,
+                                    render_node_path);
+  }
+
+  compositor_drm_render_node_fd_.reset(HANDLE_EINTR(dup(drm_fd.get())));
+  PCHECK(compositor_drm_render_node_fd_.is_valid())
+      << "Cannot retain the Wayland compositor's DRM render node";
+  compositor_drm_device_id_ = compositor_device_id;
 }
 
 }  // namespace ui

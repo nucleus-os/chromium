@@ -320,6 +320,17 @@ SkColorType ToClosestSkColorTypeExternalSampler(viz::SharedImageFormat format) {
   }
 }
 
+bool GraphiteDawnUsesExternalSampler(viz::SharedImageFormat format) {
+#if BUILDFLAG(IS_ANDROID)
+  return format.PrefersExternalSampler();
+#else
+  // Dawn's Linux DMA-BUF import supports plane views for multiplanar formats,
+  // but Chromium does not provide the native YCbCr descriptor required to
+  // sample the whole image through one texture view.
+  return false;
+#endif
+}
+
 GLFormatCaps::GLFormatCaps(const gles2::FeatureInfo* feature_info)
     : angle_rgbx_internal_format_(
           feature_info->feature_flags().angle_rgbx_internal_format),
@@ -533,7 +544,8 @@ DXGI_FORMAT ToDXGIFormat(viz::SharedImageFormat format) {
 }
 #endif  // BUILDFLAG(IS_WIN)
 
-wgpu::TextureFormat ToDawnFormat(viz::SharedImageFormat format) {
+std::optional<wgpu::TextureFormat> MaybeToDawnFormat(
+    viz::SharedImageFormat format) {
   if (format == viz::SinglePlaneFormat::kRGBA_8888 ||
       format == viz::SinglePlaneFormat::kRGBX_8888) {
     return wgpu::TextureFormat::RGBA8Unorm;
@@ -572,6 +584,14 @@ wgpu::TextureFormat ToDawnFormat(viz::SharedImageFormat format) {
     return wgpu::TextureFormat::R10X6BG10X6Biplanar422Unorm;
   } else if (format == viz::MultiPlaneFormat::kP410) {
     return wgpu::TextureFormat::R10X6BG10X6Biplanar444Unorm;
+  }
+
+  return std::nullopt;
+}
+
+wgpu::TextureFormat ToDawnFormat(viz::SharedImageFormat format) {
+  if (auto dawn_format = MaybeToDawnFormat(format)) {
+    return *dawn_format;
   }
 
   NOTREACHED() << "Unsupported format: " << format.ToString();
@@ -695,7 +715,7 @@ skgpu::graphite::TextureInfo GraphitePromiseTextureInfo(
   skgpu::graphite::DawnTextureInfo dawn_texture_info;
   dawn_texture_info.fSampleCount = skgpu::graphite::SampleCount::k1;
 
-  if (ycbcr_info || format.PrefersExternalSampler()) {
+  if (ycbcr_info || GraphiteDawnUsesExternalSampler(format)) {
     dawn_texture_info.fFormat = wgpu::TextureFormat::OpaqueYCbCrAndroid;
     dawn_texture_info.fViewFormat = wgpu::TextureFormat::OpaqueYCbCrAndroid;
   } else {
@@ -771,7 +791,7 @@ skgpu::graphite::DawnTextureInfo DawnBackendTextureInfo(
   skgpu::graphite::DawnTextureInfo dawn_texture_info;
   dawn_texture_info.fSampleCount = skgpu::graphite::SampleCount::k1;
 
-  if (format.PrefersExternalSampler()) {
+  if (GraphiteDawnUsesExternalSampler(format)) {
     dawn_texture_info.fFormat = wgpu::TextureFormat::OpaqueYCbCrAndroid;
     dawn_texture_info.fViewFormat = wgpu::TextureFormat::OpaqueYCbCrAndroid;
     dawn_texture_info.fAspect = wgpu::TextureAspect::All;

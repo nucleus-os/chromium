@@ -506,6 +506,27 @@ void GpuDataManagerImplPrivate::StartUmaTimer() {
 }
 
 void GpuDataManagerImplPrivate::InitializeGpuModes() {
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  if (command_line->HasSwitch(
+          switches::kRequireSkiaGraphiteDawnVulkan)) {
+    CHECK(!command_line->HasSwitch(switches::kDisableGpu))
+        << "Graphite/Dawn/Vulkan is required but GPU acceleration is disabled";
+    CHECK(!command_line->HasSwitch(switches::kDisableGpuCompositing))
+        << "Graphite/Dawn/Vulkan is required but GPU compositing is disabled";
+    CHECK(!command_line->HasSwitch(switches::kDisableSkiaGraphite))
+        << "Graphite/Dawn/Vulkan is required but Graphite is disabled";
+    CHECK(features::IsSkiaGraphiteEnabled(command_line))
+        << "Graphite/Dawn/Vulkan is required but Graphite is unavailable";
+    CHECK_EQ(command_line->GetSwitchValueASCII(
+                 switches::kSkiaGraphiteDawnBackend),
+             switches::kSkiaGraphiteDawnBackendVulkan)
+        << "Graphite/Dawn/Vulkan is required but Dawn is not configured for "
+           "Vulkan";
+
+    gpu_mode_ = gpu::GpuMode::HARDWARE_GRAPHITE;
+    return;
+  }
+
   DCHECK_EQ(gpu::GpuMode::UNKNOWN, gpu_mode_);
   // Android and Chrome OS can't switch to software compositing. If the GPU
   // process initialization fails or GPU process is too unstable then crash the
@@ -517,7 +538,6 @@ void GpuDataManagerImplPrivate::InitializeGpuModes() {
   }
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS)
 
-  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   if (command_line->HasSwitch(switches::kDisableGpu)) {
 
 #if (BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CAST_ANDROID)) || \
@@ -1368,6 +1388,15 @@ void GpuDataManagerImplPrivate::UpdateGpuPreferences(
 
   gpu_preferences->fallback_gr_context_types.clear();
 
+  if (command_line->HasSwitch(
+          switches::kRequireSkiaGraphiteDawnVulkan)) {
+    CHECK_EQ(gpu_mode_, gpu::GpuMode::HARDWARE_GRAPHITE);
+    CHECK_EQ(gpu_preferences->gr_context_type,
+             gpu::GrContextType::kGraphiteDawn);
+    CHECK(fallback_modes_.empty());
+    return;
+  }
+
   if (gpu_mode_ == gpu::GpuMode::HARDWARE_GRAPHITE &&
       features::IsUsingVulkan()) {
     // We add kVulkan to fallback types for the GPU process to fall back from
@@ -1676,6 +1705,12 @@ gpu::GpuMode GpuDataManagerImplPrivate::GetGpuMode() const {
 }
 
 void GpuDataManagerImplPrivate::FallBackToNextGpuMode() {
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kRequireSkiaGraphiteDawnVulkan)) {
+    LOG(FATAL) << "Required Graphite/Dawn/Vulkan renderer failed to initialize; "
+                  "renderer fallback is forbidden";
+  }
+
   if (fallback_modes_.empty()) {
 #if BUILDFLAG(IS_ANDROID)
     FatalGpuProcessLaunchFailureOnBackground();
@@ -1691,6 +1726,12 @@ void GpuDataManagerImplPrivate::FallBackToNextGpuMode() {
 }
 
 void GpuDataManagerImplPrivate::FallBackToNextGpuModeDueToCrash() {
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kRequireSkiaGraphiteDawnVulkan)) {
+    LOG(FATAL) << "Required Graphite/Dawn/Vulkan renderer exceeded the GPU "
+                  "process crash limit; renderer fallback is forbidden";
+  }
+
   FallBackToNextGpuMode();
 
   // If we fell back to sofware GL due to crashes and it is disabled with a
