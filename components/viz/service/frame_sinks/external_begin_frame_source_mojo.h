@@ -81,7 +81,8 @@ class VIZ_SERVICE_EXPORT ExternalBeginFrameSourceMojo
                                  const BeginFrameArgs& args) override;
 
   void MaybeProduceFrameCallback();
-  void DispatchFrameCallback(const BeginFrameAck& ack);
+  void CompletePendingFrame(const BeginFrameAck& ack);
+  void AbortPendingFrame() override;
 
   const raw_ptr<FrameSinkManagerImpl> frame_sink_manager_;
 
@@ -100,6 +101,10 @@ class VIZ_SERVICE_EXPORT ExternalBeginFrameSourceMojo
   // This is only set after an external begin frame has actually been issued.
   std::optional<uint64_t> original_source_id_;
 
+  // Immutable identity of the accepted Mojo transaction. This must not be
+  // inferred from ExternalBeginFrameSource::last_begin_frame_args_, which is
+  // not updated while delivery is deferred by GPU-busy throttling.
+  std::optional<BeginFrameArgs> pending_frame_args_;
   base::flat_set<FrameSinkId> pending_frame_sinks_;
   std::optional<BeginFrameAck> pending_ack_;
   raw_ptr<Display> display_ = nullptr;

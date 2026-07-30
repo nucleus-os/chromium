@@ -187,6 +187,13 @@ void PaintedScrollbarLayerImpl::AppendThumbQuads(
 void PaintedScrollbarLayerImpl::AppendTrackAndButtonsQuads(
     viz::CompositorRenderPass* render_pass,
     AppendQuadsData* append_quads_data) {
+  // Fluent overlay scrollbars retain their track geometry for hit testing,
+  // but only the thumb should be visible over page content.
+  if (IsFluentOverlayScrollbarEnabled() &&
+      !has_find_in_page_tickmarks()) {
+    return;
+  }
+
   if (IsFluentOverlayScrollbarEnabled() &&
       thumb_thickness_scale_factor() <= GetIdleThicknessScale() &&
       !has_find_in_page_tickmarks()) {

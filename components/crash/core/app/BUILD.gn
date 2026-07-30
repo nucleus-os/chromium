@@ -79,6 +79,7 @@ static_library("app") {
     "//base",
     "//build:branding_buildflags",
     "//build:chromeos_buildflags",
+    "//cef/libcef/features:buildflags",
     "//components/crash/core/common:crash_key",
     "//content/public/common:content_descriptors",
     "//third_party/crashpad/crashpad/client",

@@ -4,6 +4,9 @@
 
 import("//build/config/ozone.gni")
 import("//build/config/ui.gni")
+
+# Keep CEF's OSR-only source additions out of ordinary Chromium outputs.
+import("//cef/libcef/features/features.gni")
 import("//components/viz/viz.gni")
 import("//components/vrp_flags/features.gni")
 import("//gpu/vulkan/features.gni")
@@ -289,9 +292,14 @@ viz_component("service") {
     "transitions/surface_animation_manager.h",
     "transitions/transferable_resource_tracker.cc",
     "transitions/transferable_resource_tracker.h",
-    "//cef/libcef/browser/osr/software_output_device_proxy.cc",
-    "//cef/libcef/browser/osr/software_output_device_proxy.h",
   ]
+
+  if (enable_cef) {
+    sources += [
+      "//cef/libcef/browser/osr/software_output_device_proxy.cc",
+      "//cef/libcef/browser/osr/software_output_device_proxy.h",
+    ]
+  }
 
   defines = [ "VIZ_SERVICE_IMPLEMENTATION" ]
 
@@ -305,6 +313,7 @@ viz_component("service") {
     "//cc/animation",
     "//cc/base",
     "//cc/paint",
+    "//cef/libcef/features:buildflags",
     "//components/crash/core/common:crash_key",
     "//components/input",
     "//components/input:mojom",
