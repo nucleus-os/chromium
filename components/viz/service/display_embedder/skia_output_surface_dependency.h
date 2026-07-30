@@ -24,7 +24,7 @@ class GURL;
 namespace gl {
 class GLSurface;
 class Presenter;
-}
+}  // namespace gl
 
 namespace gpu {
 
@@ -42,6 +42,10 @@ class GrShaderCache;
 }
 
 }  // namespace gpu
+
+namespace ui {
+class OzonePresenter;
+}  // namespace ui
 
 namespace viz {
 
@@ -77,6 +81,9 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceDependency {
   // return kNullSurfaceHandle.
   virtual bool IsOffscreen() = 0;
   virtual gpu::SurfaceHandle GetSurfaceHandle() = 0;
+#if BUILDFLAG(IS_OZONE)
+  virtual std::unique_ptr<ui::OzonePresenter> CreateOzonePresenter() = 0;
+#endif
   virtual scoped_refptr<gl::Presenter> CreatePresenter() = 0;
   virtual scoped_refptr<gl::GLSurface> CreateGLSurface(
       gl::GLSurfaceFormat format) = 0;

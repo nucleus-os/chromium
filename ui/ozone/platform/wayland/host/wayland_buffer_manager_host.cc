@@ -114,6 +114,10 @@ bool WaylandBufferManagerHost::SupportsAcquireFence() const {
          connection_->UseImplicitSyncInterop();
 }
 
+bool WaylandBufferManagerHost::SupportsExplicitSync() const {
+  return connection_->SupportsExplicitSync();
+}
+
 bool WaylandBufferManagerHost::SupportsViewporter() const {
   return !!connection_->viewporter();
 }

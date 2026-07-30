@@ -29,7 +29,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
           tabs::kMigrateEverythingMenuPinnedToTabstrip));
   registry->RegisterBooleanPref(
       prefs::kEverythingMenuPinnedToTabstripMigrationComplete, false);
-  registry->RegisterBooleanPref(prefs::kVerticalTabsEnabled, false);
+  registry->RegisterBooleanPref(prefs::kVerticalTabsEnabled, true);
   registry->RegisterBooleanPref(
       prefs::kVerticalTabsExpandOnHoverEnabled,
       tabs::kVerticalTabsExpandOnHoverDefaultEnabled.Get());

@@ -132,6 +132,7 @@ class WaylandBufferManagerTest : public WaylandTest {
                                     /*supports_dma_buf=*/false,
                                     /*supports_viewporter=*/true,
                                     /*supports_acquire_fence=*/false,
+                                    /*supports_explicit_sync=*/false,
                                     /*supports_overlays=*/true,
                                     /*supports_single_pixel_buffer=*/true);
     surface_id_ = window_->root_surface()->get_surface_id();
@@ -214,6 +215,7 @@ class WaylandBufferManagerTest : public WaylandTest {
                     /*supports_dma_buf=*/false,
                     /*supports_viewporter=*/true,
                     /*supports_acquire_fence=*/false,
+                    /*supports_explicit_sync=*/false,
                     /*supports_overlays=*/true,
                     /*supports_single_pixel_buffer=*/true);
                 surface_factory_->SetBufferManagerForTesting(
@@ -2473,6 +2475,7 @@ TEST_P(WaylandBufferManagerTest,
                                   /*supports_dma_buf=*/false,
                                   /*supports_viewporter=*/true,
                                   /*supports_acquire_fence=*/false,
+                                  /*supports_explicit_sync=*/false,
                                   /*supports_overlays=*/true,
                                   /*supports_single_pixel_buffer=*/true);
 
@@ -2597,6 +2600,7 @@ TEST_P(WaylandBufferManagerTest, HidesSubsurfacesOnChannelDestroyed) {
                                   /*supports_dma_buf=*/false,
                                   /*supports_viewporter=*/true,
                                   /*supports_acquire_fence=*/false,
+                                  /*supports_explicit_sync=*/false,
                                   /*supports_overlays=*/true,
                                   /*supports_single_pixel_buffer=*/true);
 
@@ -2844,6 +2848,7 @@ TEST_P(WaylandBufferManagerTest, ExecutesTasksAfterInitialization) {
                                   /*supports_dma_buf=*/false,
                                   /*supports_viewporter=*/true,
                                   /*supports_acquire_fence=*/false,
+                                  /*supports_explicit_sync=*/false,
                                   /*supports_overlays=*/true,
                                   /*supports_single_pixel_buffer=*/true);
 

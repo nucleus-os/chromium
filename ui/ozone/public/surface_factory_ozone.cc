@@ -15,6 +15,7 @@
 #include "ui/gfx/native_pixmap.h"
 #include "ui/gl/gl_implementation.h"
 #include "ui/ozone/public/overlay_surface.h"
+#include "ui/ozone/public/ozone_presenter.h"
 #include "ui/ozone/public/platform_window_surface.h"
 #include "ui/ozone/public/surface_ozone_canvas.h"
 
@@ -64,6 +65,11 @@ SurfaceFactoryOzone::CreateNativePixmapForVulkan(
 
 std::unique_ptr<PlatformWindowSurface>
 SurfaceFactoryOzone::CreatePlatformWindowSurface(
+    gfx::AcceleratedWidget widget) {
+  return nullptr;
+}
+
+std::unique_ptr<OzonePresenter> SurfaceFactoryOzone::CreateOzonePresenter(
     gfx::AcceleratedWidget widget) {
   return nullptr;
 }

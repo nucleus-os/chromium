@@ -120,6 +120,8 @@
 #endif
 
 #if BUILDFLAG(IS_OZONE)
+#include "components/viz/service/display_embedder/output_presenter_ozone.h"
+#include "ui/ozone/public/ozone_presenter.h"
 #include "ui/ozone/public/ozone_platform.h"
 #include "ui/ozone/public/platform_window_surface.h"
 #include "ui/ozone/public/surface_factory_ozone.h"
@@ -2190,6 +2192,34 @@ bool SkiaOutputSurfaceImplOnGpu::InitializeForDawn() {
         GetDidSwapBuffersCompleteCallback());
     return true;
   }
+
+#if BUILDFLAG(IS_OZONE)
+  std::unique_ptr<ui::OzonePresenter> ozone_presenter =
+      dependency_->CreateOzonePresenter();
+  if (ozone_presenter) {
+#if BUILDFLAG(IS_LINUX)
+    auto* dawn_context = context_state_->dawn_context_provider();
+    if (!dawn_context ||
+        dawn_context->backend_type() != wgpu::BackendType::Vulkan) {
+      LOG(FATAL) << "Native Wayland Graphite presentation requires Dawn's "
+                    "Vulkan backend.";
+      return false;
+    }
+#endif
+    output_device_ = std::make_unique<SkiaOutputDeviceBufferQueue>(
+        std::make_unique<OutputPresenterOzone>(std::move(ozone_presenter)),
+        dependency_, shared_image_representation_factory_.get(),
+        shared_gpu_deps_->memory_tracker(), GetDidSwapBuffersCompleteCallback(),
+        GetReleaseOverlaysCallback());
+    return true;
+  }
+#endif
+
+#if BUILDFLAG(IS_LINUX)
+  LOG(FATAL) << "Native Linux Graphite presentation requires a Wayland "
+                "Ozone presenter with explicit synchronization.";
+  return false;
+#endif
 
 #if BUILDFLAG(SUPPORTS_OZONE_X11)
   // TODO(rivr): Set up a Vulkan swapchain so that Linux can also use

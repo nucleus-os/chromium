@@ -98,6 +98,8 @@ component("ozone_base") {
     "public/overlay_surface.h",
     "public/overlay_surface_candidate.cc",
     "public/overlay_surface_candidate.h",
+    "public/ozone_presenter.cc",
+    "public/ozone_presenter.h",
     "public/platform_clipboard.h",
     "public/platform_gl_egl_utility.cc",
     "public/platform_gl_egl_utility.h",

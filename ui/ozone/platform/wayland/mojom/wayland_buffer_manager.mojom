@@ -107,6 +107,9 @@ interface WaylandBufferManagerGpu {
   // `supports_acquire_fence` indicates whether acquire fences can be submitted
   // with buffers for wayland servers to wait on before accessing buffer
   // contents.
+  // `supports_explicit_sync` indicates that acquire and release fences are
+  // backed by the compositor's linux-drm-syncobj-v1 protocol rather than the
+  // DMA-BUF implicit-sync interop compatibility path.
   // `supports_overlays` indicates whether overlays should be used with this
   // Wayland compositor.
   Initialize(pending_remote<WaylandBufferManagerHost> remote_host,
@@ -115,6 +118,7 @@ interface WaylandBufferManagerGpu {
              bool supports_dma_buf,
              bool supports_viewporter,
              bool supports_acquire_fence,
+             bool supports_explicit_sync,
              bool supports_overlays,
              bool supports_single_pixel_buffer);
 

@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "base/check.h"
 #include "base/functional/bind.h"
 #include "base/process/process.h"
 #include "base/task/current_thread.h"
@@ -21,7 +22,6 @@
 #include "ui/gfx/linux/drm_util_linux.h"
 #include "ui/gfx/overlay_priority_hint.h"
 #include "ui/gl/gl_bindings.h"
-#include "ui/gl/gl_surface_egl.h"
 #include "ui/ozone/platform/wayland/common/wayland_overlay_config.h"
 #include "ui/ozone/platform/wayland/gpu/wayland_surface_gpu.h"
 #include "ui/ozone/public/overlay_plane.h"
@@ -80,6 +80,7 @@ void WaylandBufferManagerGpu::Initialize(
     bool supports_dma_buf,
     bool supports_viewporter,
     bool supports_acquire_fence,
+    bool supports_explicit_sync,
     bool supports_overlays,
     bool supports_single_pixel_buffer) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(gpu_sequence_checker_);
@@ -89,8 +90,10 @@ void WaylandBufferManagerGpu::Initialize(
     gpu_thread_runner_ = base::SingleThreadTaskRunner::GetCurrentDefault();
 
   supported_formats_with_modifiers_ = shared_image_formats_with_modifiers;
+  CHECK(!supports_explicit_sync || supports_acquire_fence);
   supports_viewporter_ = supports_viewporter;
   supports_acquire_fence_ = supports_acquire_fence;
+  supports_explicit_sync_ = supports_explicit_sync;
   supports_dmabuf_ = supports_dma_buf;
   supports_overlays_ = supports_overlays;
   supports_single_pixel_buffer_ = supports_single_pixel_buffer;
@@ -324,11 +327,9 @@ void WaylandBufferManagerGpu::DestroyBuffer(uint32_t buffer_id) {
 
 #if defined(WAYLAND_GBM)
 GbmDevice* WaylandBufferManagerGpu::GetGbmDevice() {
-  // Wayland won't support wl_drm or zwp_linux_dmabuf without this extension.
-  if (!supports_dmabuf_ || (!gl::GLSurfaceEGL::GetGLDisplayEGL()
-                                 ->ext->b_EGL_EXT_image_dma_buf_import &&
-                            !use_fake_gbm_device_for_test_)) {
-    supports_dmabuf_ = false;
+  // GBM allocation and Wayland DMA-BUF presentation do not require EGL.
+  // Rendering backends are responsible for validating their own import path.
+  if (!supports_dmabuf_) {
     return nullptr;
   }
 
@@ -372,6 +373,11 @@ bool WaylandBufferManagerGpu::AllowsImplicitModifierForFormat(
 
 uint32_t WaylandBufferManagerGpu::AllocateBufferID() {
   return ++next_buffer_id_ ? next_buffer_id_ : ++next_buffer_id_;
+}
+
+uint32_t WaylandBufferManagerGpu::AllocateFrameID() {
+  base::AutoLock scoped_lock(lock_);
+  return ++next_frame_id_ ? next_frame_id_ : ++next_frame_id_;
 }
 
 bool WaylandBufferManagerGpu::SupportsFormat(
@@ -448,6 +454,13 @@ void WaylandBufferManagerGpu::HandlePresentationOnOriginThread(
   }
 }
 
+void WaylandBufferManagerGpu::HandleDisconnectOnOriginThread(
+    gfx::AcceleratedWidget widget) {
+  if (auto* surface = GetSurface(widget)) {
+    surface->OnBufferManagerDisconnected();
+  }
+}
+
 #if defined(WAYLAND_GBM)
 void WaylandBufferManagerGpu::OpenAndStoreDrmRenderNodeFd(
     const base::FilePath& drm_node_path) {
@@ -487,6 +500,17 @@ void WaylandBufferManagerGpu::MaybeCreateGbmDevice() {
 
 void WaylandBufferManagerGpu::OnHostDisconnected() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(gpu_sequence_checker_);
+
+  for (const auto& [widget, runner] : commit_thread_runners_) {
+    runner->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            &WaylandBufferManagerGpu::HandleDisconnectOnOriginThread,
+            base::Unretained(this), widget));
+  }
+  pending_tasks_.clear();
+  supports_acquire_fence_ = false;
+  supports_explicit_sync_ = false;
 
   // WaylandBufferManagerHost may bind host again after an error. See
   // WaylandBufferManagerHost::BindInterface for more details.

@@ -38,6 +38,8 @@ class WaylandSurfaceFactory : public SurfaceFactoryOzone {
       bool use_swiftshader,
       bool allow_protected_memory) override;
 #endif
+  std::unique_ptr<OzonePresenter> CreateOzonePresenter(
+      gfx::AcceleratedWidget widget) override;
   std::unique_ptr<SurfaceOzoneCanvas> CreateCanvasForWidget(
       gfx::AcceleratedWidget widget) override;
   scoped_refptr<gfx::NativePixmap> CreateNativePixmap(

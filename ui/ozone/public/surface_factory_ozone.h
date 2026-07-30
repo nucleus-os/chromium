@@ -40,24 +40,23 @@ class VulkanDeviceQueue;
 namespace ui {
 
 class SurfaceOzoneCanvas;
+class OzonePresenter;
 class OverlaySurface;
 class PlatformWindowSurface;
 
 // The Ozone interface allows external implementations to hook into Chromium to
-// provide a system specific implementation. The Ozone interface supports two
-// drawing modes: 1) accelerated drawing using GL and 2) software drawing
-// through Skia.
+// provide a system specific implementation. The Ozone interface supports
+// accelerated drawing through a rendering-API-independent native presenter or
+// the legacy GL path, and software drawing through Skia.
 //
-// If you want to paint on a window with ozone, you need to create a GLSurface
-// or SurfaceOzoneCanvas for that window. The platform can support software, GL,
-// or both for painting on the window. The following functionality is specific
-// to the drawing mode and may not have any meaningful implementation in the
-// other mode. An implementation must provide functionality for at least one
-// mode.
+// If you want to paint on a window with Ozone, create an OzonePresenter,
+// GLSurface, or SurfaceOzoneCanvas for that window. The platform can support
+// one or more of those modes.
 //
-// 1) Accelerated Drawing (GL path):
+// 1) Accelerated Drawing:
 //
-// The following functions are specific to GL:
+// The rendering-API-independent path uses CreateOzonePresenter. The following
+// functions are specific to legacy GL:
 //  - GetAllowedGLImplementations
 //  - GetGLOzone (along with the associated GLOzone)
 //
@@ -114,6 +113,12 @@ class COMPONENT_EXPORT(OZONE_BASE) SurfaceFactoryOzone {
   // Creates a rendering and presentation API agnostic surface for a platform
   // window.
   virtual std::unique_ptr<PlatformWindowSurface> CreatePlatformWindowSurface(
+      gfx::AcceleratedWidget window);
+
+  // Creates an accelerated, rendering-API-independent presenter for a platform
+  // window. Returns null when the platform has no native-pixmap presentation
+  // path.
+  virtual std::unique_ptr<OzonePresenter> CreateOzonePresenter(
       gfx::AcceleratedWidget window);
 
   // Creates an overlay surface for a platform window.
