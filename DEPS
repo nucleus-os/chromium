@@ -331,11 +331,11 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
-  'v8_revision': '61ac84bde33f6df3e53df05742de164a26a1ae66',
+  'v8_revision': 'a5423b52e73a9d651ec9aeefa1cad55c9213e1af',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
-  'angle_revision': '6dab7c7e742b528fd52233d3cc926e61b1e7d70d',
+  'angle_revision': '1263bc04f59885d441c1a032d71d664b52e1d655',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling SwiftShader
   # and whatever else without interference from each other.
@@ -431,7 +431,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling feed
   # and whatever else without interference from each other.
-  'dawn_revision': '583f3600453cc982a3dac39308cac8939875d7af',
+  'dawn_revision': '10aefbda6b606cc2ba7f4f5016a6eeba5655ce0a',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling feed
   # and whatever else without interference from each other.
@@ -1939,7 +1939,7 @@ deps = {
   },
 
   'src/third_party/angle':
-    Var('chromium_git') + '/angle/angle.git' + '@' +  Var('angle_revision'),
+    'https://github.com/nucleus-os/angle.git' + '@' + Var('angle_revision'),
 
   'src/third_party/anonymous_tokens/src':
     Var('chromium_git') + '/external/github.com/google/anonymous-tokens.git' + '@' + 'f5499d91ee1b8ab56b6d110e8e9a0d94c0a6eca7',
@@ -2028,7 +2028,7 @@ deps = {
     Var('chromium_git') + '/external/github.com/videolan/dav1d.git' + '@' + '77ef66354d76a3c8aa4b11cde8093294fce23b0f',
 
   'src/third_party/dawn':
-    Var('dawn_git') + '/dawn.git' + '@' +  Var('dawn_revision'),
+    'https://github.com/nucleus-os/dawn.git' + '@' + Var('dawn_revision'),
 
   'src/third_party/highway/src':
     Var('chromium_git') + '/external/github.com/google/highway.git' + '@' + Var('highway_revision'),
@@ -3195,7 +3195,7 @@ deps = {
   },
 
   'src/v8':
-    Var('chromium_git') + '/v8/v8.git' + '@' +  Var('v8_revision'),
+    'https://github.com/nucleus-os/v8.git' + '@' + Var('v8_revision'),
 
 # See checkout_src_internal_infra declaration.
 # LINT.IfChange
