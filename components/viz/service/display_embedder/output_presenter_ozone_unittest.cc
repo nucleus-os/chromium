@@ -95,6 +95,7 @@ class TestOverlayAccess {
     factory_ref_ = manager_.Register(std::move(backing), &tracker_);
     representation_ = manager_.ProduceOverlay(mailbox_, &tracker_);
     CHECK(representation_);
+    representation_->SetCleared();
     access_ = representation_->BeginScopedReadAccess();
     CHECK(access_);
   }
