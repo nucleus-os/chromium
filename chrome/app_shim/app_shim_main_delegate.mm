@@ -19,6 +19,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_executor.h"
 #include "base/threading/thread.h"
+#include "cef/libcef/features/features.h"
 #include "chrome/app/chrome_crash_reporter_client.h"
 #include "chrome/app_shim/app_shim_application.h"
 #include "chrome/app_shim/app_shim_controller.h"
@@ -77,7 +78,9 @@ std::optional<int> AppShimMainDelegate::BasicStartupComplete() {
 }
 
 void AppShimMainDelegate::PreSandboxStartup() {
+#if !BUILDFLAG(ENABLE_CEF)
   ChromeCrashReporterClient::Create();
+#endif
   crash_reporter::InitializeCrashpad(true, "app_shim");
 
   // Initialize features and field trials, either from command line or from

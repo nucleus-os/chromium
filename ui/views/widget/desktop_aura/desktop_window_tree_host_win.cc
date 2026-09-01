@@ -28,6 +28,7 @@
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/client/cursor_client.h"
 #include "ui/aura/client/focus_client.h"
+#include "ui/aura/native_window_occlusion_tracker.h"
 #include "ui/aura/window_event_dispatcher.h"
 #include "ui/base/class_property.h"
 #include "ui/base/cursor/cursor.h"
@@ -203,17 +204,30 @@ void DesktopWindowTreeHostWin::Init(const Widget::InitParams& params) {
                         native_widget_delegate_.get());
 
   HWND parent_hwnd = nullptr;
-  if (params.parent && params.parent->GetHost()) {
+  if (params.parent_widget) {
+    parent_hwnd = params.parent_widget;
+    has_external_parent_ = true;
+  } else if (params.parent && params.parent->GetHost()) {
     parent_hwnd = params.parent->GetHost()->GetAcceleratedWidget();
   }
 
   remove_standard_frame_ = params.remove_standard_frame;
   has_non_client_view_ = Widget::RequiresNonClientView(params.type);
   z_order_ = params.EffectiveZOrderLevel();
+  is_menu_ = (params.type == Widget::InitParams::TYPE_MENU);
 
-  // We don't have an HWND yet, so scale relative to the nearest screen.
-  gfx::Rect pixel_bounds =
-      display::win::GetScreenWin()->DIPToScreenRect(nullptr, params.bounds);
+  gfx::Rect pixel_bounds;
+  if (has_external_parent_ && !is_menu_) {
+    // Scale relative to the screen that contains the parent window.
+    // Child windows always have origin (0,0).
+    pixel_bounds.set_size(display::win::GetScreenWin()->DIPToScreenSize(
+        parent_hwnd, params.bounds.size()));
+  } else {
+    // We don't have an HWND yet, so scale relative to the nearest screen.
+    pixel_bounds =
+        display::win::GetScreenWin()->DIPToScreenRect(nullptr, params.bounds);
+  }
+
   message_handler_->Init(parent_hwnd, pixel_bounds);
 
   if (ShouldAddDWMBackdrop()) {
@@ -237,6 +251,13 @@ void DesktopWindowTreeHostWin::Init(const Widget::InitParams& params) {
   OnAcceleratedWidgetAvailable();
   InitHost();
   window()->Show();
+
+  if (params.show_state == ui::mojom::WindowShowState::kMinimized) {
+    // Delay enablement of native occlusion tracking until the
+    // initially-minimized window is restored for the first time.
+    // See CEF issue #3638.
+    initially_minimized_first_restore_pending_ = true;
+  }
 
   // Stack immediately above its parent so that it does not cover other
   // root-level windows, with the exception of menus, to allow them to be
@@ -1121,6 +1142,16 @@ void DesktopWindowTreeHostWin::HandleCreate() {
 }
 
 void DesktopWindowTreeHostWin::HandleDestroying() {
+  // With CEF external parent the platform window (HWND) may be a child of a
+  // window owned by a different thread. During DestroyWindow of such a window
+  // the OS can deliver WM_DESTROY multiple times, so only handle the first
+  // call. Widget::HandleWidgetDestroying (called via
+  // OnNativeWidgetDestroying) CHECKs that it's only called once.
+  if (destroying_handled_) {
+    return;
+  }
+  destroying_handled_ = true;
+
   drag_drop_client_->OnNativeWidgetDestroying(GetHWND());
   if (native_widget_delegate_) {
     native_widget_delegate_->OnNativeWidgetDestroying();
@@ -1226,6 +1257,18 @@ void DesktopWindowTreeHostWin::HandleWindowMinimizedOrRestored(bool restored) {
 
   if (restored) {
     window()->Show();
+
+    if (initially_minimized_first_restore_pending_) {
+      initially_minimized_first_restore_pending_ = false;
+
+      // Enable native occlusion tracking for initially-minimized windows here
+      // to avoid incorrect hidden state after restore. See CEF issue #3638.
+      if (aura::NativeWindowOcclusionTracker::
+              IsNativeWindowOcclusionTrackingAlwaysEnabled(this)) {
+        aura::NativeWindowOcclusionTracker::EnableNativeWindowOcclusionTracking(
+            this);
+      }
+    }
   } else {
     window()->Hide();
   }
@@ -1247,17 +1290,29 @@ void DesktopWindowTreeHostWin::HandleFrameChanged() {
 }
 
 void DesktopWindowTreeHostWin::HandleNativeFocus(HWND last_focused_window) {
-  // TODO(beng): inform the native_widget_delegate_.
+  // See comments in CefBrowserPlatformDelegateNativeWin::SetFocus.
+  if (has_external_parent_ && CanActivate()) {
+    HandleActivationChanged(true);
+  }
 }
 
 void DesktopWindowTreeHostWin::HandleNativeBlur(HWND focused_window) {
-  // TODO(beng): inform the native_widget_delegate_.
+  // See comments in CefBrowserPlatformDelegateNativeWin::SetFocus.
+  if (has_external_parent_ && CanActivate()) {
+    HandleActivationChanged(false);
+  }
 }
 
 bool DesktopWindowTreeHostWin::HandleMouseEvent(ui::MouseEvent* event) {
   // Ignore native platform events for test purposes
   if (ui::PlatformEventSource::ShouldIgnoreNativePlatformEvents()) {
     return true;
+  }
+
+  // See comments in CefBrowserPlatformDelegateNativeWin::SetFocus.
+  if (has_external_parent_ && CanActivate() && event->IsAnyButton() &&
+      ::GetFocus() != GetHWND()) {
+    ::SetFocus(GetHWND());
   }
 
   SendEventToSink(event);
@@ -1455,9 +1510,18 @@ void DesktopWindowTreeHostWin::SetBoundsInDIP(const gfx::Rect& bounds) {
   // positions in variable-DPI situations. See https://crbug.com/1224715 for
   // details.
   aura::Window* root = nullptr;
-  const gfx::Rect bounds_in_pixels =
+  if (has_external_parent_ && !is_menu_) {
+    // Scale relative to the screen that contains the parent window.
+    root = AsWindowTreeHost()->window();
+  }
+  gfx::Rect bounds_in_pixels =
       display::Screen::Get()->DIPToScreenRectInWindow(
           root, AdjustedContentBounds(bounds));
+  if (has_external_parent_ && !is_menu_) {
+    // Child windows always have origin (0,0).
+    // Menus need to use proper screen coordinates for positioning.
+    bounds_in_pixels.set_origin(gfx::Point(0, 0));
+  }
   AsWindowTreeHost()->SetBoundsInPixels(bounds_in_pixels);
 }
 

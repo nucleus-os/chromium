@@ -25,6 +25,10 @@
 
 namespace {
 
+bool IsChromeIgnoreUrl(const std::string& spec) {
+  return base::EqualsCaseInsensitiveASCII(spec, "chrome://ignore/");
+}
+
 bool IsNonNavigationAboutUrl(const GURL& url) {
   if (!url.is_valid()) {
     return false;
@@ -32,8 +36,8 @@ bool IsNonNavigationAboutUrl(const GURL& url) {
 
   const std::string spec(url.spec());
   return base::EqualsCaseInsensitiveASCII(spec, chrome::kChromeUIRestartURL) ||
-         base::EqualsCaseInsensitiveASCII(spec, chrome::kChromeUIQuitURL);
-  ;
+         base::EqualsCaseInsensitiveASCII(spec, chrome::kChromeUIQuitURL) ||
+         IsChromeIgnoreUrl(spec);
 }
 
 }  // namespace
@@ -100,6 +104,9 @@ bool HandleNonNavigationAboutURL(const GURL& url,
   if (base::EqualsCaseInsensitiveASCII(spec, chrome::kChromeUIQuitURL)) {
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE, base::BindOnce(&chrome::AttemptExit));
+    return true;
+  }
+  if (IsChromeIgnoreUrl(spec)) {
     return true;
   }
   NOTREACHED();

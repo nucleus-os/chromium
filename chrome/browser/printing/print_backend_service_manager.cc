@@ -89,7 +89,15 @@ void MaybeCloneOrCopy(
 // to support modal dialogs from OOP.
 uint32_t NativeViewToUint(gfx::NativeView view) {
 #if BUILDFLAG(IS_WIN)
-  return base::win::HandleToUint32(views::HWNDForNativeView(view));
+  // |view| will be nullptr with CEF OSR. In that case return the desktop
+  // window handle (same behavior as PrintingContextWin::GetRootWindow) to
+  // avoid a DCHECK in PrintingContextSystemDialogWin::AskUserForSettings
+  // with OOP printing.
+  HWND hwnd = views::HWNDForNativeView(view);
+  if (!hwnd) {
+    hwnd = ::GetDesktopWindow();
+  }
+  return base::win::HandleToUint32(hwnd);
 #else
   NOTREACHED();
 #endif

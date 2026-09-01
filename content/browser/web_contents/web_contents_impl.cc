@@ -4336,6 +4336,12 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params,
       params.main_frame_name, GetOpener(), primary_main_frame_policy,
       base::UnguessableToken::Create());
 
+  if (params.view && params.delegate_view) {
+    view_.reset(params.view);
+    render_view_host_delegate_view_ = params.delegate_view;
+  }
+
+  if (!view_) {
   std::unique_ptr<WebContentsViewDelegate> delegate =
       GetContentClient()->browser()->GetWebContentsViewDelegate(this);
 
@@ -4345,6 +4351,7 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params,
   } else {
     view_ = CreateWebContentsView(this, std::move(delegate),
                                   &render_view_host_delegate_view_);
+  }
   }
   CHECK(render_view_host_delegate_view_);
   CHECK(view_.get());
@@ -4567,6 +4574,9 @@ void WebContentsImpl::RenderWidgetCreated(
   OPTIONAL_TRACE_EVENT1("content", "WebContentsImpl::RenderWidgetCreated",
                         "render_widget_host", render_widget_host);
   created_widgets_[render_widget_host->GetFrameSinkId()] = render_widget_host;
+
+  observers_.NotifyObservers(
+      &WebContentsObserver::RenderWidgetCreated, render_widget_host);
 }
 
 void WebContentsImpl::RenderWidgetDeleted(
@@ -5597,6 +5607,15 @@ FrameTree* WebContentsImpl::CreateNewWindow(
 
   if (params.pip_options) {
     create_params.picture_in_picture_options = *(params.pip_options);
+  }
+
+  if (delegate_) {
+    delegate_->GetCustomWebContentsView(this,
+                                        params.target_url,
+                                        render_process_id.value(),
+                                        opener->GetRoutingID(),
+                                        &create_params.view,
+                                        &create_params.delegate_view);
   }
 
   // Check whether there is an available prerendered page for this navigation if
@@ -10798,6 +10817,9 @@ void WebContentsImpl::SetFocusedFrame(FrameTreeNode* node,
   }
 
   CloseListenerManager::DidChangeFocusedFrame(this);
+
+  observers_.NotifyObservers(&WebContentsObserver::OnFrameFocused,
+                             node->current_frame_host());
 }
 
 FrameTree* WebContentsImpl::GetOwnedDocumentPictureInPictureFrameTree() {

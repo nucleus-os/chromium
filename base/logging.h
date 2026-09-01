@@ -537,6 +537,7 @@ class BASE_EXPORT LogMessage {
   std::string str() const { return stream_.str(); }
   const char* file() const { return file_; }
   int line() const { return line_; }
+  size_t message_start() const { return message_start_; }
 
   // Gets file:line: message in a format suitable for crash reporting.
   std::string BuildCrashString() const;

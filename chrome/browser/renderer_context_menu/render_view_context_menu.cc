@@ -468,6 +468,18 @@ ui::ImageModel GetLensContextMenuIcon() {
   );
 }
 
+RenderViewContextMenu::MenuCreatedCallback* GetMenuCreatedCallback() {
+  static base::NoDestructor<RenderViewContextMenu::MenuCreatedCallback>
+      callback;
+  return callback.get();
+}
+
+RenderViewContextMenu::MenuShowHandlerCallback* GetMenuShowHandlerCallback() {
+  static base::NoDestructor<RenderViewContextMenu::MenuShowHandlerCallback>
+      callback;
+  return callback.get();
+}
+
 enum class UmaEnumIdLookupType {
   GeneralEnumId,
   ContextSpecificEnumId,
@@ -743,6 +755,10 @@ int FindUMAEnumValueForCommand(int id, UmaEnumIdLookupType type) {
   if (ContextMenuMatcher::IsExtensionsCustomCommandId(id)) {
     return 1;
   }
+
+  // Match the MENU_ID_USER_FIRST to MENU_ID_USER_LAST range from cef_types.h.
+  if (id >= 26500 && id <= 28500)
+    return 1;
 
   id = CollapseCommandsForUMA(id);
   const auto& map = GetIdcToUmaMap(type);
@@ -1069,6 +1085,14 @@ RenderViewContextMenu::RenderViewContextMenu(
                    : nullptr;
   system_app_ = app_controller ? app_controller->system_app() : nullptr;
 #endif  // BUILDFLAG(IS_CHROMEOS)
+
+  auto* cb = GetMenuCreatedCallback();
+  if (!cb->is_null()) {
+    first_observer_ = cb->Run(this);
+    if (first_observer_) {
+      observers_.AddObserver(first_observer_.get());
+    }
+  }
 
   observers_.AddObserver(&autofill_context_menu_manager_);
 }
@@ -1527,6 +1551,12 @@ void RenderViewContextMenu::InitMenu() {
     if (!use_simplified_menu_for_text_selection) {
       AppendReadAnythingItem();
     }
+  }
+
+  if (first_observer_) {
+    // Do this last so that the observer can optionally modify previously
+    // created items.
+    first_observer_->InitMenu(params_);
   }
 }
 
@@ -4229,6 +4259,26 @@ void RenderViewContextMenu::AddObserverForTesting(
 void RenderViewContextMenu::RemoveObserverForTesting(
     RenderViewContextMenuObserver* observer) {
   observers_.RemoveObserver(observer);
+}
+
+// static
+void RenderViewContextMenu::RegisterMenuCreatedCallback(
+    MenuCreatedCallback cb) {
+  *GetMenuCreatedCallback() = cb;
+}
+
+// static
+void RenderViewContextMenu::RegisterMenuShowHandlerCallback(
+    MenuShowHandlerCallback cb) {
+  *GetMenuShowHandlerCallback() = cb;
+}
+
+bool RenderViewContextMenu::UseShowHandler() {
+  auto* cb = GetMenuShowHandlerCallback();
+  if (!cb->is_null() && cb->Run(this)) {
+    return true;
+  }
+  return false;
 }
 
 custom_handlers::ProtocolHandlerRegistry::ProtocolHandlerList

@@ -25,6 +25,7 @@
 #include "base/message_loop/message_pump_wakeup_counter.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/task/current_thread.h"
 #include "base/task/task_features.h"
 #include "base/trace_event/interned_args_helper.h"
 #include "base/trace_event/typed_macros.h"
@@ -590,7 +591,19 @@ bool MessagePumpForUI::ProcessNextWindowsMessage() {
       if (native_event_observer_) {
         native_event_observer_->WillRunNativeEvent(next_peek_message_event_id_);
       }
-      has_msg = ::PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE) != FALSE;
+
+      // We should not process all window messages if we are in the context of
+      // an OS modal loop, i.e. in the context of a windows API call like
+      // MessageBox. This is to ensure that these messages are peeked out by the
+      // OS modal loop.
+      if (CurrentThread::Get()->os_modal_loop()) {
+        // We only peek out WM_PAINT and WM_TIMER here for reasons mentioned
+        // above.
+        has_msg = PeekMessage(&msg, NULL, WM_PAINT, WM_PAINT, PM_REMOVE) ||
+                  PeekMessage(&msg, NULL, WM_TIMER, WM_TIMER, PM_REMOVE);
+      } else {
+        has_msg = PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) != FALSE;
+      }
       if (native_event_observer_) {
         native_event_observer_->DidRunNativeEvent(
             next_peek_message_event_id_++);

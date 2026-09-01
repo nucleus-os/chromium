@@ -31,6 +31,7 @@ class BrowserViewLayoutDelegateImpl : public BrowserViewLayoutDelegate {
       bool use_browser_bounds) const override;
   WindowState GetBrowserWindowState() const override;
   views::LayoutAlignment GetWindowTitleAlignment() const override;
+  void UpdateDialogTopInsetInBrowserView(int* dialog_top_y) const override;
   bool IsToolbarVisible() const override;
   bool IsBookmarkBarVisible() const override;
   bool IsInfobarVisible() const override;

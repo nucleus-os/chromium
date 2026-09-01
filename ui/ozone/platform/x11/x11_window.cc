@@ -1935,7 +1935,17 @@ void X11Window::CreateXWindow(const PlatformWindowInitProperties& properties) {
   req.border_pixel = 0;
 
   last_set_bounds_px_ = SanitizeBounds(bounds);
-  req.parent = x_root_window_;
+  // Menu windows should be parented to the root window to prevent them from
+  // being clipped to a parent window's bounds. This is especially important
+  // for OSR (off-screen rendering) scenarios where the parent is an external
+  // window. Other window types maintain their normal parent relationship.
+  if (properties.type == ui::PlatformWindowType::kMenu) {
+    req.parent = x_root_window_;
+  } else {
+    req.parent = properties.parent_widget == gfx::kNullAcceleratedWidget
+                     ? x_root_window_
+                     : static_cast<x11::Window>(properties.parent_widget);
+  }
   req.x = last_set_bounds_px_.x();
   req.y = last_set_bounds_px_.y();
   req.width = last_set_bounds_px_.width();

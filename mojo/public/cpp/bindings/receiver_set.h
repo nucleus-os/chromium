@@ -73,7 +73,8 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) ReceiverSetState {
     virtual void* GetContext() = 0;
     virtual void InstallDispatchHooks(
         std::unique_ptr<MessageFilter> filter,
-        RepeatingConnectionErrorWithReasonCallback disconnect_handler) = 0;
+        RepeatingConnectionErrorWithReasonAndResultCallback
+            disconnect_handler) = 0;
     virtual void FlushForTesting() = 0;
     virtual void ResetWithReason(uint32_t custom_reason_code,
                                  std::string_view description) = 0;
@@ -95,7 +96,8 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) ReceiverSetState {
     void WillDispatch();
     void DidDispatchOrReject();
     void OnDisconnect(uint32_t custom_reason_code,
-                      const std::string& description);
+                      const std::string& description,
+                      MojoResult error_result);
 
     // RAW_PTR_EXCLUSION: Binary size increase.
     RAW_PTR_EXCLUSION ReceiverSetState& state_;
@@ -131,6 +133,8 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) ReceiverSetState {
   void set_disconnect_handler(base::RepeatingClosure handler);
   void set_disconnect_with_reason_handler(
       RepeatingConnectionErrorWithReasonCallback handler);
+  void set_disconnect_with_reason_and_result_handler(
+      RepeatingConnectionErrorWithReasonAndResultCallback handler);
 
   ReportBadMessageCallback GetBadMessageCallback();
   ReceiverId Add(std::unique_ptr<ReceiverState> receiver,
@@ -143,11 +147,14 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) ReceiverSetState {
   void SetDispatchContext(void* context, ReceiverId receiver_id);
   void OnDisconnect(ReceiverId id,
                     uint32_t custom_reason_code,
-                    const std::string& description);
+                    const std::string& description,
+                    MojoResult error_result);
 
  private:
   base::RepeatingClosure disconnect_handler_;
   RepeatingConnectionErrorWithReasonCallback disconnect_with_reason_handler_;
+  RepeatingConnectionErrorWithReasonAndResultCallback
+      disconnect_with_reason_and_result_handler_;
   ReceiverId next_receiver_id_ = 0;
   EntryMap entries_;
   raw_ptr<void, DanglingUntriaged> current_context_ = nullptr;
@@ -510,11 +517,12 @@ class ReceiverSetBase {
     const void* GetContext() const override { return &context_; }
     void* GetContext() override { return &context_; }
 
-    void InstallDispatchHooks(std::unique_ptr<MessageFilter> filter,
-                              RepeatingConnectionErrorWithReasonCallback
-                                  disconnect_handler) override {
+    void InstallDispatchHooks(
+        std::unique_ptr<MessageFilter> filter,
+        RepeatingConnectionErrorWithReasonAndResultCallback
+            disconnect_handler) override {
       receiver_.SetFilter(std::move(filter));
-      receiver_.set_disconnect_with_reason_handler(
+      receiver_.set_disconnect_with_reason_and_result_handler(
           std::move(disconnect_handler));
     }
 

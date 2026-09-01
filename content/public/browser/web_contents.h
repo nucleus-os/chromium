@@ -137,6 +137,7 @@ class PreloadPipelineInfo;
 class PrerenderHandle;
 class RenderFrameHost;
 class RenderViewHost;
+class RenderViewHostDelegateView;
 class RenderWidgetHost;
 class RenderWidgetHostView;
 class ScreenOrientationDelegate;
@@ -144,6 +145,7 @@ class SiteInstance;
 class SurfaceEmbedConnector;
 class UnownedInnerWebContentsClient;
 class WebContentsDelegate;
+class WebContentsView;
 class WebUI;
 struct DropData;
 struct MHTMLGenerationParams;
@@ -299,6 +301,10 @@ class WebContents : public PageNavigator, public base::SupportsUserData {
     // Sandboxing flags set on the new WebContents.
     network::mojom::WebSandboxFlags starting_sandbox_flags =
         network::mojom::WebSandboxFlags::kNone;
+
+    // Optionally specify the view and delegate view.
+    raw_ptr<content::WebContentsView> view = nullptr;
+    raw_ptr<content::RenderViewHostDelegateView> delegate_view = nullptr;
 
     // Value used to set the last time the WebContents was made active, this is
     // the value that'll be returned by GetLastActiveTimeTicks(). If this is

@@ -423,6 +423,10 @@ bool PersistentSystemProfile::GetSystemProfile(
   return true;
 }
 
+void PersistentSystemProfile::DetachFromCurrentThread() {
+  DETACH_FROM_SEQUENCE(sequence_checker_);
+}
+
 // static
 void PersistentSystemProfile::MergeUpdateRecords(
     const base::PersistentMemoryAllocator& memory_allocator,

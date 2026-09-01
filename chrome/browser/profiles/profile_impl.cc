@@ -39,6 +39,7 @@
 #include "base/version.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
+#include "cef/libcef/features/features.h"
 #include "chrome/browser/background/background_contents_service_factory.h"
 #include "chrome/browser/background_fetch/background_fetch_delegate_factory.h"
 #include "chrome/browser/background_fetch/background_fetch_delegate_impl.h"
@@ -237,6 +238,10 @@
 #include "chrome/browser/background/extensions/background_mode_manager.h"  // nogncheck crbug.com/40147906
 #endif
 
+#if BUILDFLAG(ENABLE_CEF)
+#include "cef/libcef/browser/prefs/pref_names.h"
+#endif
+
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 #include "chrome/browser/extensions/chrome_content_browser_client_extensions_part.h"  // nogncheck crbug.com/40147906
 #include "chrome/browser/extensions/extension_special_storage_policy.h"  // nogncheck crbug.com/40147906
@@ -284,6 +289,12 @@ using content::DownloadManagerDelegate;
 class ScopedAllowBlockingForProfile : public base::ScopedAllowBlocking {};
 
 namespace {
+
+#if BUILDFLAG(ENABLE_CEF)
+BASE_FEATURE(kStorageNotificationService,
+             "StorageNotificationService",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+#endif
 
 #if BUILDFLAG(ENABLE_SESSION_SERVICE)
 // Delay before we explicitly create the SessionService.
@@ -1075,7 +1086,9 @@ Profile* ProfileImpl::GetOffTheRecordProfile(const OTRProfileID& otr_profile_id,
 
   otr_profiles_[otr_profile_id] = std::move(otr_profile);
 
-  NotifyOffTheRecordProfileCreated(raw_otr_profile);
+  // With CEF we want to delay initialization.
+  if (!otr_profile_id.IsUniqueForCEF())
+    NotifyOffTheRecordProfileCreated(raw_otr_profile);
 
   return raw_otr_profile;
 }
@@ -1421,6 +1434,12 @@ ProfileImpl::GetStorageNotificationService() {
 #if BUILDFLAG(IS_ANDROID)
   return nullptr;
 #else
+#if BUILDFLAG(ENABLE_CEF)
+  if (!base::FeatureList::IsEnabled(kStorageNotificationService) ||
+      !GetPrefs()->GetBoolean(cef::prefs::kEnableStorageNotificationService)) {
+    return nullptr;
+  }
+#endif
   return StorageNotificationServiceFactory::GetForBrowserContext(this);
 #endif
 }

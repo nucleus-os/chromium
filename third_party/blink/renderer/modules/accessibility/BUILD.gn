@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//cef/libcef/features/features.gni")
 import("//third_party/blink/renderer/modules/modules.gni")
 
 blink_modules_sources("accessibility") {
@@ -71,6 +72,17 @@ blink_modules_sources("accessibility") {
       "ax_debug_utils.cc",
       "ax_debug_utils.h",
     ]
+  }
+
+  if (enable_cef) {
+    sources += [
+      "//cef/libcef/renderer/accessibility/build_collapsed_summary_node.inc",
+      "//cef/libcef/renderer/accessibility/viewport_collapse.cc",
+      "//cef/libcef/renderer/accessibility/viewport_collapse.h",
+      "//cef/libcef/renderer/accessibility/walk_ax_nodes_with_collapse.inc",
+    ]
+    configs += [ "//cef/libcef/features:config" ]
+    deps += [ "//cef/libcef/features:deps" ]
   }
 
   if (is_android) {

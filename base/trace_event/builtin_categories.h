@@ -104,6 +104,8 @@ PERFETTO_DEFINE_CATEGORIES_IN_NAMESPACE_WITH_ATTRS(
     perfetto::Category("cast.stream"),
     perfetto::Category("cc").SetTags("rendering"),
     perfetto::Category("cc.debug").SetTags("debug"),
+    perfetto::Category("cef"),
+    perfetto::Category("cef.client"),
     perfetto::Category("chromeos"),
     perfetto::Category("cma"),
     perfetto::Category("compositor"),

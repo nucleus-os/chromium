@@ -65,6 +65,8 @@ namespace ui {
 
 namespace {
 
+bool g_multi_threaded_message_loop = false;
+
 // Singleton OzonePlatform implementation for X11 platform.
 class OzonePlatformX11 : public OzonePlatform,
                          public OSExchangeDataProviderFactoryOzone {
@@ -274,7 +276,15 @@ class OzonePlatformX11 : public OzonePlatform,
     TouchFactory::SetTouchDeviceListFromCommandLine();
 
 #if BUILDFLAG(USE_GTK)
-    linux_ui_delegate_ = std::make_unique<LinuxUiDelegateX11>();
+    // Not creating the LinuxUiDelegateX11 will disable creation of GtkUi
+    // (interface to GTK desktop features) and cause ui::GetDefaultLinuxUi()
+    // (and related functions) to return nullptr. We can't use GtkUi in
+    // combination with multi-threaded-message-loop because Chromium's GTK
+    // implementation doesn't use GDK threads. Light/dark theme changes will
+    // still be detected via DarkModeManagerLinux.
+    if (!g_multi_threaded_message_loop) {
+      linux_ui_delegate_ = std::make_unique<LinuxUiDelegateX11>();
+    }
 #endif
 
     menu_utils_ = std::make_unique<X11MenuUtils>();
@@ -371,6 +381,10 @@ class OzonePlatformX11 : public OzonePlatform,
 
 OzonePlatform* CreateOzonePlatformX11() {
   return new OzonePlatformX11;
+}
+
+void SetMultiThreadedMessageLoopX11() {
+  g_multi_threaded_message_loop = true;
 }
 
 }  // namespace ui

@@ -472,6 +472,16 @@ class BLINK_EXPORT WebView {
   // Returns the number of live WebView instances in this process.
   static size_t GetWebViewCount();
 
+  // Sets whether to allow the use of JavaScript moveTo/By() and resizeTo/By()
+  // (without user activation) with Document picture-in-picture popups.
+  virtual void SetMovePictureInPictureEnabled(bool enabled) = 0;
+  virtual bool MovePictureInPictureEnabled() const = 0;
+
+  // Sets whether to allow opening Document picture-in-picture windows without
+  // user activation. Defaults to false (user activation required).
+  virtual void SetAllowPictureInPictureWithoutUserActivation(bool allow) = 0;
+  virtual bool AllowPictureInPictureWithoutUserActivation() const = 0;
+
  protected:
   ~WebView() = default;
 };

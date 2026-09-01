@@ -324,6 +324,10 @@ class BrowserWindowInterface : public content::PageNavigator {
   // browser window (e.g. most of the 3-dot menu actions).
   virtual BrowserActions* GetActions() = 0;
 
+  // Returns true if this is a normal browser as determined by
+  // BrowserWindowFeatures::IsNormalBrowser.
+  virtual bool IsNormalBrowser() const = 0;
+
   // This is used by features that need to operate on most or all tabs in the
   // browser window. Do not use this method to find a specific tab.
   virtual std::vector<tabs::TabInterface*> GetAllTabInterfaces() = 0;

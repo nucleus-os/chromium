@@ -196,6 +196,10 @@ component("gtk") {
 
   # TODO: This should be removed.
   deps += [ "//ui/ozone" ]
+
+  if (is_clang) {
+    cflags = [ "-Wno-deprecated-volatile" ]
+  }
 }
 
 if (use_gtk) {

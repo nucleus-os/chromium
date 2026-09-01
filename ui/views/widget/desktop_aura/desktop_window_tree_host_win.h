@@ -366,6 +366,22 @@ class VIEWS_EXPORT DesktopWindowTreeHostWin
   // Overrides the remote session detection for testing.
   std::optional<bool> remote_session_for_testing_;
 
+  // True if the widget has a external parent view/window outside of the
+  // Chromium-controlled view/window hierarchy.
+  bool has_external_parent_ = false;
+
+  // True if HandleDestroying() has already been called. The OS may deliver
+  // WM_DESTROY multiple times when the window is a child of a window owned by
+  // a different thread (CEF external parent).
+  bool destroying_handled_ = false;
+
+  // True if this widget is a menu.
+  bool is_menu_ = false;
+
+  // True if the first call to HandleWindowMinimizedOrRestored for an initially-
+  // minimized window is pending.
+  bool initially_minimized_first_restore_pending_ = false;
+
   // Visibility of the cursor. On Windows we can have multiple root windows and
   // the implementation of ::ShowCursor() is based on a counter, so making this
   // member static ensures that ::ShowCursor() is always called exactly once

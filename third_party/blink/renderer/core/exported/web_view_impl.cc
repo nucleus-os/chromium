@@ -1863,6 +1863,8 @@ void WebView::ApplyWebPreferences(const web_pref::WebPreferences& prefs,
   settings->SetForceDarkModeEnabled(prefs.force_dark_mode_enabled);
 
   settings->SetAccessibilityAlwaysShowFocus(prefs.always_show_focus);
+  settings->SetAccessibilityViewportCollapse(
+      prefs.accessibility_viewport_collapse);
   settings->SetAutoplayPolicy(prefs.autoplay_policy);
   settings->SetRequireTransientActivationForGetDisplayMedia(
       prefs.require_transient_activation_for_get_display_media);

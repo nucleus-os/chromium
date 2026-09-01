@@ -71,6 +71,7 @@ void MenuRunnerImplRemoteCocoa::RunMenuAt(
     ui::mojom::MenuSourceType source_type,
     int32_t run_types,
     gfx::NativeView native_view_for_gestures,
+    gfx::AcceleratedWidget parent_widget,
     std::optional<gfx::RoundedCornersF> corners,
     std::optional<std::string> show_menu_host_duration_histogram) {
   RunMenu(parent, bounds.CenterPoint());

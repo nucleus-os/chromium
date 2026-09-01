@@ -134,6 +134,7 @@ component("variations") {
     ":buildflags",
     ":variations_mojom",
     "proto",
+    "//cef/libcef/features:buildflags",
     "//base:build_time",
     "//components/crash/core/common:crash_key",
     "//components/prefs",

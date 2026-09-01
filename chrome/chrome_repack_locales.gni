@@ -4,6 +4,7 @@
 
 import("//build/config/chrome_build.gni")
 import("//build/config/ui.gni")
+import("//cef/libcef/features/features.gni")
 import("//extensions/buildflags/buildflags.gni")
 import("//tools/grit/repack.gni")
 
@@ -113,6 +114,10 @@ template("chrome_repack_locales") {
       deps += [
         "//third_party/search_engines_data:search_engine_descriptions_strings",
       ]
+    }
+    if (enable_cef) {
+      source_patterns += [ "${root_gen_dir}/cef/cef_strings_" ]
+      deps += [ "//cef:cef_strings" ]
     }
     if (enable_extensions_core) {
       source_patterns +=

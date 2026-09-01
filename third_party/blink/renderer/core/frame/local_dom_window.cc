@@ -50,6 +50,7 @@
 #include "third_party/blink/public/platform/task_type.h"
 #include "third_party/blink/public/platform/web_string.h"
 #include "third_party/blink/public/web/web_picture_in_picture_window_options.h"
+#include "third_party/blink/public/web/web_view.h"
 #include "third_party/blink/renderer/bindings/core/v8/binding_security.h"
 #include "third_party/blink/renderer/bindings/core/v8/capture_source_location.h"
 #include "third_party/blink/renderer/bindings/core/v8/isolated_world_csp.h"
@@ -107,6 +108,7 @@
 #include "third_party/blink/renderer/core/frame/settings.h"
 #include "third_party/blink/renderer/core/frame/viewport_data.h"
 #include "third_party/blink/renderer/core/frame/visual_viewport.h"
+#include "third_party/blink/renderer/core/frame/web_local_frame_impl.h"
 #include "third_party/blink/renderer/core/html/custom/custom_element_registry.h"
 #include "third_party/blink/renderer/core/html/custom/custom_element_registry_assignment.h"
 #include "third_party/blink/renderer/core/html/fenced_frame/fence.h"
@@ -2099,7 +2101,7 @@ void LocalDOMWindow::moveBy(int x, int y) const {
     return;
   }
 
-  if (IsPictureInPictureWindow()) {
+  if (IsPictureInPictureWindow() && !MovePictureInPictureEnabled()) {
     return;
   }
 
@@ -2124,7 +2126,7 @@ void LocalDOMWindow::moveTo(int x, int y) const {
     return;
   }
 
-  if (IsPictureInPictureWindow()) {
+  if (IsPictureInPictureWindow() && !MovePictureInPictureEnabled()) {
     return;
   }
 
@@ -2152,7 +2154,8 @@ void LocalDOMWindow::resizeBy(int x,
   }
 
   if (IsPictureInPictureWindow()) {
-    if (!LocalFrame::ConsumeTransientUserActivation(GetFrame())) {
+    if (!MovePictureInPictureEnabled() &&
+        !LocalFrame::ConsumeTransientUserActivation(GetFrame())) {
       exception_state.ThrowDOMException(
           DOMExceptionCode::kNotAllowedError,
           "resizeBy() requires user activation in document picture-in-picture");
@@ -2184,7 +2187,8 @@ void LocalDOMWindow::resizeTo(int width,
   }
 
   if (IsPictureInPictureWindow()) {
-    if (!LocalFrame::ConsumeTransientUserActivation(GetFrame())) {
+    if (!MovePictureInPictureEnabled() &&
+        !LocalFrame::ConsumeTransientUserActivation(GetFrame())) {
       exception_state.ThrowDOMException(
           DOMExceptionCode::kNotAllowedError,
           "resizeTo() requires user activation in document picture-in-picture");
@@ -2636,6 +2640,12 @@ DOMWindow* LocalDOMWindow::openPictureInPictureWindow(
   LocalDOMWindow* pip_dom_window =
       To<LocalDOMWindow>(result.frame->DomWindow());
   pip_dom_window->SetIsPictureInPictureWindow();
+
+  if (WebLocalFrameImpl::FromFrame(entered_window->GetFrame())
+          ->View()
+          ->MovePictureInPictureEnabled()) {
+    pip_dom_window->SetMovePictureInPictureEnabled(true);
+  }
 
   // Ensure that we're using the same compatibility mode as the opener document.
   pip_dom_window->document()->SetCompatibilityMode(

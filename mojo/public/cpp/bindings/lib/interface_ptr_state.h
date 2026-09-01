@@ -231,6 +231,15 @@ class InterfacePtrState : public InterfacePtrStateBase {
         std::move(error_handler));
   }
 
+  void set_connection_error_with_reason_and_result_handler(
+      ConnectionErrorWithReasonAndResultCallback error_handler) {
+    ConfigureProxyIfNecessary();
+
+    DCHECK(endpoint_client());
+    endpoint_client()->set_connection_error_with_reason_and_result_handler(
+        std::move(error_handler));
+  }
+
   void set_idle_handler(base::TimeDelta timeout,
                         base::RepeatingClosure handler) {
     ConfigureProxyIfNecessary();

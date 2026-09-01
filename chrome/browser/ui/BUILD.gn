@@ -7,6 +7,7 @@ import("//build/config/compiler/compiler.gni")
 import("//build/config/features.gni")
 import("//build/config/ozone.gni")
 import("//build/config/ui.gni")
+import("//cef/libcef/features/features.gni")
 import("//chrome/browser/buildflags.gni")
 import("//chrome/common/features.gni")
 import("//components/captive_portal/core/features.gni")
@@ -424,6 +425,10 @@ static_library("ui") {
     "//build/config/compiler:wexit_time_destructors",
   ]
 
+  if (enable_cef) {
+    configs += [ "//cef/libcef/features:config" ]
+  }
+
   public_deps = [
     # WARNING WARNING WARNING
     # New dependencies outside of //chrome/browser should be added to
@@ -481,6 +486,7 @@ static_library("ui") {
     "//build/config/linux/dbus:buildflags",
     "//build/util:chromium_git_revision",
     "//cc/paint",
+    "//cef/libcef/features:buildflags",
     "//chrome:resources",
     "//chrome:strings",
     "//chrome/app:chrome_dll_resources",
@@ -1054,6 +1060,13 @@ static_library("ui") {
       # TODO(crbug.com/420905611): Remove this circular dependency when
       # c/b/ui/browser_dialogs.h gets componentized.
       "//chrome/browser/ui/extensions:impl",
+    ]
+  }
+
+  if (enable_cef) {
+    deps += [
+      "//cef:cef_resources",
+      "//cef/libcef/features:deps",
     ]
   }
 
@@ -5156,6 +5169,7 @@ static_library("ui") {
       "//chrome/browser/printing",
       "//chrome/browser/printing:impl",
       "//components/printing/browser",
+      "//components/printing/common:mojo_interfaces",
       "//printing",
     ]
     allow_circular_includes_from += [ "//chrome/browser/printing:impl" ]

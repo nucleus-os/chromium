@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import("//cef/libcef/features/features.gni")
 import("../build/crashpad_buildconfig.gni")
 
 static_library("common") {
@@ -108,11 +109,23 @@ if (!crashpad_is_ios) {
       "../minidump",
       "../snapshot",
       "../tools:tool_support",
+      "//cef/libcef/features:buildflags",
     ]
 
     if (crashpad_is_win) {
       cflags =
           [ "/wd4201" ]  # nonstandard extension used : nameless struct/union
+    }
+
+    if (enable_cef) {
+      sources += [
+        "//cef/libcef/common/cef_crash_report_upload_thread.cc",
+        "//cef/libcef/common/cef_crash_report_upload_thread.h",
+        "//cef/libcef/common/cef_crash_report_utils.cc",
+        "//cef/libcef/common/cef_crash_report_utils.h",
+      ]
+
+      configs += [ "//cef/libcef/features:config" ]
     }
   }
 

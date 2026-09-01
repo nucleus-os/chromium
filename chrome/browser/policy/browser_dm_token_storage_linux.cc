@@ -22,6 +22,7 @@
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
 #include "base/threading/scoped_blocking_call.h"
+#include "chrome/browser/policy/chrome_browser_policy_connector.h"
 #include "chrome/common/chrome_paths.h"
 #include "components/policy/core/common/policy_logger.h"
 #include "crypto/obsolete/sha1.h"
@@ -137,8 +138,8 @@ std::string BrowserDMTokenStorageLinux::InitEnrollmentToken() {
   std::string enrollment_token;
   base::FilePath dir_policy_files_path;
 
-  if (!base::PathService::Get(chrome::DIR_POLICY_FILES,
-                              &dir_policy_files_path)) {
+  if (!ChromeBrowserPolicyConnector::GetDirPolicyFilesPath(
+          &dir_policy_files_path)) {
     return std::string();
   }
 
@@ -175,8 +176,8 @@ bool BrowserDMTokenStorageLinux::InitEnrollmentErrorOption() {
   std::string options;
   base::FilePath dir_policy_files_path;
 
-  if (!base::PathService::Get(chrome::DIR_POLICY_FILES,
-                              &dir_policy_files_path)) {
+  if (!ChromeBrowserPolicyConnector::GetDirPolicyFilesPath(
+          &dir_policy_files_path)) {
     return false;
   }
 

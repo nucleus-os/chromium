@@ -101,6 +101,9 @@ class BLINK_EXPORT WebElement : public WebNode {
   WebString TextContent() const;
   WebString TextContentAbridged(unsigned int max_length) const;
   WebString InnerHTML() const;
+  WebString AttributeLocalName(unsigned index) const;
+  WebString AttributeValue(unsigned index) const;
+  unsigned AttributeCount() const;
 
   void Focus();
 

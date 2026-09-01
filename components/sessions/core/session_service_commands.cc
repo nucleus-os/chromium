@@ -237,9 +237,10 @@ enum PersistedWindowShowState {
   PERSISTED_SHOW_STATE_MAXIMIZED = 3,
   // SHOW_STATE_INACTIVE (4) never persisted.
   PERSISTED_SHOW_STATE_FULLSCREEN = 5,
-  PERSISTED_SHOW_STATE_DETACHED_DEPRECATED = 6,
-  PERSISTED_SHOW_STATE_DOCKED_DEPRECATED = 7,
-  PERSISTED_SHOW_STATE_END = 8,
+  // SHOW_STATE_HIDDEN (6) never persisted.
+  PERSISTED_SHOW_STATE_DETACHED_DEPRECATED = 7,
+  PERSISTED_SHOW_STATE_DOCKED_DEPRECATED = 8,
+  PERSISTED_SHOW_STATE_END = 9,
 };
 
 // Assert to ensure PersistedWindowShowState is updated if ui::WindowShowState
@@ -257,6 +258,7 @@ PersistedWindowShowState ShowStateToPersistedShowState(
     case ui::mojom::WindowShowState::kNormal:
       return PERSISTED_SHOW_STATE_NORMAL;
     case ui::mojom::WindowShowState::kMinimized:
+    case ui::mojom::WindowShowState::kHidden:
       return PERSISTED_SHOW_STATE_MINIMIZED;
     case ui::mojom::WindowShowState::kMaximized:
       return PERSISTED_SHOW_STATE_MAXIMIZED;

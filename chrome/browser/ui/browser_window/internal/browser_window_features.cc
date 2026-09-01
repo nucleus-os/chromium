@@ -237,6 +237,15 @@
 BrowserWindowFeatures::BrowserWindowFeatures() = default;
 BrowserWindowFeatures::~BrowserWindowFeatures() = default;
 
+// static
+bool BrowserWindowFeatures::IsNormalBrowser(const Browser* browser) {
+  // CEF normal browsers have TYPE_POPUP.
+  if (browser->is_type_popup() && browser->cef_delegate()) {
+    return true;
+  }
+  return browser->is_type_normal();
+}
+
 void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
   // This is used only for the controllers which will be created on demand
   // later.
@@ -636,6 +645,9 @@ void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
   // Foundational state used throughout this function. Computed/assigned early
   // so the alphabetical sections below can rely on them.
   Profile* const profile = browser_->GetProfile();
+
+  const bool supports_toolbar = IsNormalBrowser(browser);
+
   BrowserView* const browser_view =
       BrowserView::GetBrowserViewForBrowser(browser);
   WebUIBrowserWindow* const webui_browser_window =
@@ -698,18 +710,6 @@ void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
   if (browser_view) {
     contents_border_controller_ =
         std::make_unique<ContentsBorderController>(browser_view);
-  }
-
-  if (browser_view) {
-    if (browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL ||
-        browser_->GetType() == BrowserWindowInterface::Type::TYPE_POPUP ||
-        browser_view->GetIsWebAppType()) {
-      data_protection_ui_controller_ =
-          GetUserDataFactory()
-              .CreateInstance<
-                  enterprise_data_protection::DataProtectionUIController>(
-                  *browser_view->browser(), browser_view);
-    }
   }
 
 #if BUILDFLAG(ENABLE_EXTENSIONS) && (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC))
@@ -849,7 +849,7 @@ void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
       browser, browser->GetTabStripModel(), browser->GetSessionID(),
       browser->GetType());
 
-  if (browser->is_type_normal() || browser->is_type_app()) {
+  if (supports_toolbar || browser->is_type_app()) {
     toast_service_ = std::make_unique<ToastService>(browser);
   }
 
@@ -887,7 +887,7 @@ void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
   // omnibox and a tab strip). By default most new features should be
   // instantiated in this block (please keep this list ordered without taking
   // into consideration buildflags, repeating buildflags is ok):
-  if (browser->is_type_normal()) {
+  if (supports_toolbar) {
     if (browser_view) {
       if (base::FeatureList::IsEnabled(features::kGlicActorUi)) {
         std::vector<std::pair<views::WebView*, ActorOverlayWebView*>>
@@ -1039,6 +1039,38 @@ void BrowserWindowFeatures::InitPostBrowserViewConstruction(
   // Initialize post-BrowserView-dependent embedder features last.
   embedder_browser_window_features_->InitPostBrowserViewConstruction(
       browser_view);
+}
+
+void BrowserWindowFeatures::InitPostTabModelConstruction(
+    BrowserWindowInterface* interface) {
+  auto* browser_view = BrowserView::GetBrowserViewForBrowser(interface);
+  CHECK(browser_view);
+
+  auto* browser = browser_view->browser();
+  const bool supports_toolbar = IsNormalBrowser(browser);
+
+  if (supports_toolbar) {
+    if (!data_protection_ui_controller_) {
+      data_protection_ui_controller_ =
+          GetUserDataFactory()
+              .CreateInstance<
+                  enterprise_data_protection::DataProtectionUIController>(
+                  *browser, browser_view);
+    }
+  }
+}
+
+void BrowserWindowFeatures::OnWebContentsCreated(
+    BrowserWindowInterface* interface,
+    content::WebContents* target_contents) {
+#if BUILDFLAG(ENABLE_CEF)
+  auto* browser_view = BrowserView::GetBrowserViewForBrowser(interface);
+  CHECK(browser_view);
+
+  if (auto cef_delegate = browser_view->browser()->cef_delegate()) {
+    cef_delegate->OnWebContentsCreated(target_contents);
+  }
+#endif
 }
 
 void BrowserWindowFeatures::TearDownPreBrowserWindowDestruction() {

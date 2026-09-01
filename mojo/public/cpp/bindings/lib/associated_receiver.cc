@@ -56,6 +56,13 @@ void AssociatedReceiverBase::set_disconnect_with_reason_handler(
       std::move(error_handler));
 }
 
+void AssociatedReceiverBase::set_disconnect_with_reason_and_result_handler(
+    ConnectionErrorWithReasonAndResultCallback error_handler) {
+  DCHECK(is_bound());
+  endpoint_client_->set_connection_error_with_reason_and_result_handler(
+      std::move(error_handler));
+}
+
 void AssociatedReceiverBase::reset_on_disconnect() {
   DCHECK(is_bound());
   set_disconnect_handler(

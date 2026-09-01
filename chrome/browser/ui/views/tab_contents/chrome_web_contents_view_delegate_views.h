@@ -70,6 +70,7 @@ class ChromeWebContentsViewDelegateViews
       base::OnceCallback<void(std::unique_ptr<RenderViewContextMenuBase>)>
           callback) override;
   void ShowMenu(std::unique_ptr<RenderViewContextMenuBase> menu) override;
+  bool IsMenuRunning() override;
 
  private:
   void OnReadAvailableTypes(

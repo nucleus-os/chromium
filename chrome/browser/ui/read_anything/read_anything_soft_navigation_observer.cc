@@ -44,7 +44,8 @@ void ReadAnythingSoftNavigationObserver::OnSoftNavigation() {
   if (!web_contents) {
     return;
   }
-  tabs::TabInterface* tab = tabs::TabInterface::GetFromContents(web_contents);
+  tabs::TabInterface* tab =
+      tabs::TabInterface::MaybeGetFromContents(web_contents);
   if (!tab) {
     return;
   }

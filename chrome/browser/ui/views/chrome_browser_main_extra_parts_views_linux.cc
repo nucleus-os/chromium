@@ -66,7 +66,10 @@ void ChromeBrowserMainExtraPartsViewsLinux::ToolkitInitialized() {
 #endif
 
 #if BUILDFLAG(USE_DBUS)
-  dark_mode_manager_ = std::make_unique<ui::DarkModeManagerLinux>();
+  if (!ui::NativeTheme::IsForcedDarkMode() &&
+      !ui::NativeTheme::IsForcedLightMode()) {
+    dark_mode_manager_ = std::make_unique<ui::DarkModeManagerLinux>();
+  }
 #endif
 }
 

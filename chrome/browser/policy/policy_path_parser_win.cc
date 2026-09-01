@@ -12,6 +12,7 @@
 
 #include "base/strings/utf_string_conversions.h"
 #include "base/win/registry.h"
+#include "chrome/browser/policy/chrome_browser_policy_connector.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/install_static/policy_path_parser.h"
 #include "components/policy/policy_constants.h"
@@ -22,9 +23,15 @@ namespace {
 bool LoadUserDataDirPolicyFromRegistry(HKEY hive,
                                        const char* key_name_str,
                                        base::FilePath* dir) {
+  const std::wstring policy_key =
+      policy::ChromeBrowserPolicyConnector::GetPolicyKey();
+  if (policy_key.empty()) {
+    return false;
+  }
+
   std::wstring value;
   std::wstring key_name(base::ASCIIToWide(key_name_str));
-  base::win::RegKey key(hive, policy::kRegistryChromePolicyKey, KEY_READ);
+  base::win::RegKey key(hive, policy_key.c_str(), KEY_READ);
   if (key.ReadValue(key_name.c_str(), &value) == ERROR_SUCCESS) {
     *dir = base::FilePath(policy::path_parser::ExpandPathVariables(value));
     return true;

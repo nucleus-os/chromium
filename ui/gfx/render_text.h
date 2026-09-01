@@ -378,6 +378,10 @@ class COMPONENT_EXPORT(GFX) RenderText {
   void SetWhitespaceElision(std::optional<bool> elide_whitespace);
   std::optional<bool> whitespace_elision() const { return whitespace_elision_; }
 
+  // Get or set the flags that control display of accelerator characters.
+  void SetDrawStringsFlags(int flags);
+  int draw_strings_flags() const { return draw_strings_flags_; }
+
   const Rect& display_rect() const { return display_rect_; }
   void SetDisplayRect(const Rect& r);
 
@@ -1131,6 +1135,8 @@ class COMPONENT_EXPORT(GFX) RenderText {
 
   // Tell whether or not the |layout_text_| needs an update or is up to date.
   mutable bool layout_text_up_to_date_ = false;
+
+  int draw_strings_flags_ = 0;
 };
 
 }  // namespace gfx

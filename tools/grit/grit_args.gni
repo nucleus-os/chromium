@@ -4,7 +4,9 @@
 
 import("//build/config/chrome_build.gni")
 import("//build/config/devtools.gni")
+import("//build/config/locales.gni")
 import("//build/config/ui.gni")
+import("//cef/libcef/features/features.gni")
 
 shared_intermediate_dir = rebase_path(root_gen_dir, root_build_dir)
 devtools_grd_path = "$shared_intermediate_dir/$devtools_grd_location"
@@ -35,6 +37,9 @@ _grit_defines = [
   "use_titlecase=${is_mac}",
 
   "is_desktop_android=${is_desktop_android}",
+
+  "enable_cef=${enable_cef}",
+  "enable_pseudolocales=${enable_pseudolocales}",
 ]
 
 # Must match `enable_hidpi` in ui/base/ui_features.gni.

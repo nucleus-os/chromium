@@ -30,7 +30,8 @@ std::unique_ptr<OutputSurface> TestOutputSurfaceProvider::CreateOutputSurface(
     mojom::DisplayClient* display_client,
     DisplayCompositorMemoryAndTaskController* display_controller,
     const RendererSettings& renderer_settings,
-    const DebugRendererSettings* debug_settings) {
+    const DebugRendererSettings* debug_settings,
+    bool use_proxy_output_device) {
   if (gpu_compositing) {
     return FakeSkiaOutputSurface::Create3d();
   } else {

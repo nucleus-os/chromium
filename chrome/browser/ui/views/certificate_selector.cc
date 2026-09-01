@@ -334,8 +334,13 @@ void CertificateSelector::ViewCertButtonPressed() {
   if (!cert) {
     return;
   }
+  auto native_window = web_contents_->GetTopLevelNativeWindow();
+  if (!native_window) {
+    // Not supported with CEF windowless rendering.
+    return;
+  }
   ShowCertificateViewerForClientAuth(web_contents_,
-                                     web_contents_->GetTopLevelNativeWindow(),
+                                     native_window,
                                      cert->certificate());
 }
 

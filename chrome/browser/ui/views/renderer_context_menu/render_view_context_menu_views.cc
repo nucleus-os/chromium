@@ -153,6 +153,9 @@ void RenderViewContextMenuViews::RunMenuAt(views::Widget* parent,
 bool RenderViewContextMenuViews::GetAcceleratorForCommandId(
     int command_id,
     ui::Accelerator* accel) const {
+  if (RenderViewContextMenu::GetAcceleratorForCommandId(command_id, accel))
+    return true;
+
   // There are no formally defined accelerators we can query so we assume
   // that Ctrl+C, Ctrl+V, Ctrl+X, Ctrl-A, etc do what they normally do.
   switch (command_id) {
@@ -383,6 +386,10 @@ void RenderViewContextMenuViews::AppendPlatformEditableItems() {
 }
 
 void RenderViewContextMenuViews::Show() {
+  if (UseShowHandler()) {
+    return;
+  }
+
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kKioskMode)) {
     return;
   }
@@ -427,6 +434,11 @@ void RenderViewContextMenuViews::Show() {
     submenu_view_observer_ =
         std::make_unique<SubmenuViewObserver>(this, submenu_view);
   }
+}
+
+bool RenderViewContextMenuViews::IsRunning() {
+  return static_cast<ToolkitDelegateViews*>(toolkit_delegate())
+             ->IsMenuRunning();
 }
 
 views::Widget* RenderViewContextMenuViews::GetTopLevelWidget() {

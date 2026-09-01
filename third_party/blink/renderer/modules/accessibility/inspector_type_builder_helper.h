@@ -8,6 +8,8 @@
 #include "third_party/blink/renderer/core/accessibility/axid.h"
 #include "third_party/blink/renderer/core/inspector/protocol/accessibility.h"
 
+#include "cef/libcef/features/features.h"
+
 namespace blink {
 
 class AXObject;
@@ -24,6 +26,10 @@ std::unique_ptr<AXNode> BuildProtocolAXNodeForIgnoredAXObject(
     AXObject&,
     bool force_name_and_role);
 std::unique_ptr<AXNode> BuildProtocolAXNodeForUnignoredAXObject(AXObject&);
+
+#if BUILDFLAG(ENABLE_CEF)
+std::unique_ptr<AXNode> BuildCollapsedSummaryNode(AXObject& ax_object);
+#endif
 
 }  // namespace blink
 

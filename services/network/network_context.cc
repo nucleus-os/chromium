@@ -3111,22 +3111,26 @@ URLRequestContextOwner NetworkContext::MakeURLRequestContext(
             pref_service.get(), network_service_->network_quality_estimator());
   }
 
-  if (session_cleanup_cookie_store) {
-    // If the pref service was registered and initialized use it.
-    // If not, use nullptr to indicate prefs aren't available.
-    std::unique_ptr<net::CookieMonster> cookie_store =
-        std::make_unique<net::CookieMonster>(
-            session_cleanup_cookie_store.get(), net_log,
-            pref_service
-                ? std::make_unique<KnownLegacyScopeDomainsPrefDelegate>(
-                      pref_service.get())
-                : nullptr);
-    if (params_->persist_session_cookies) {
-      cookie_store->SetPersistSessionCookies(true);
-    }
-
-    builder.SetCookieStore(std::move(cookie_store));
+  // If the pref service was registered and initialized use it.
+  // If not, use nullptr to indicate prefs aren't available.
+  std::unique_ptr<net::CookieMonster> cookie_store =
+      std::make_unique<net::CookieMonster>(
+          session_cleanup_cookie_store.get(), net_log,
+          pref_service
+              ? std::make_unique<KnownLegacyScopeDomainsPrefDelegate>(
+                    pref_service.get())
+              : nullptr);
+  if (session_cleanup_cookie_store && params_->persist_session_cookies) {
+    cookie_store->SetPersistSessionCookies(true);
   }
+
+  if (params_->cookieable_schemes.has_value()) {
+    cookie_store->SetCookieableSchemes(
+        *params_->cookieable_schemes,
+        net::CookieStore::SetCookieableSchemesCallback());
+  }
+
+  builder.SetCookieStore(std::move(cookie_store));
 
   base::FilePath transport_security_persister_file_name;
   if (GetFullDataFilePath(params_->file_paths,

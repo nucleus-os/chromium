@@ -2148,7 +2148,8 @@ bool URLRequestHttpJob::ShouldAddCookieHeader() const {
   // Read cookies whenever allow_credentials() is true, even if the PrivacyMode
   // is being overridden by NetworkDelegate and will eventually block them, as
   // blocked cookies still need to be logged in that case.
-  return request_->context()->cookie_store() && request_->allow_credentials();
+  return request_->context()->cookie_store() && request_->allow_credentials() &&
+         !(request_info_.load_flags & LOAD_DO_NOT_SEND_COOKIES);
 }
 
 bool URLRequestHttpJob::ShouldRecordPartitionedCookieUsage() const {

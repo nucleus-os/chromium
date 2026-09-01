@@ -18,6 +18,7 @@
 #include "build/android_buildflags.h"
 #include "build/branding_buildflags.h"
 #include "build/build_config.h"
+#include "cef/libcef/features/features.h"
 #include "chrome/browser/about_flags.h"
 #include "chrome/browser/accessibility/accessibility_labels_service.h"
 #include "chrome/browser/accessibility/invert_bubble_prefs.h"
@@ -256,6 +257,10 @@
 #include "extensions/browser/permissions_manager.h"
 #include "extensions/browser/pref_names.h"
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+
+#if BUILDFLAG(ENABLE_CEF)
+#include "cef/libcef/browser/prefs/browser_prefs.h"
+#endif
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "chrome/browser/accessibility/animation_policy_prefs.h"
@@ -1731,6 +1736,11 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
 
   // This is intentionally last.
   RegisterLocalStatePrefsForMigration(registry);
+
+#if BUILDFLAG(ENABLE_CEF)
+  // Always call this last.
+  browser_prefs::RegisterLocalStatePrefs(registry);
+#endif
 }
 
 // Register prefs applicable to all profiles.
@@ -2272,6 +2282,10 @@ void RegisterUserProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
 void RegisterUserProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
                               const std::string& locale) {
   RegisterProfilePrefs(registry, locale);
+
+#if BUILDFLAG(ENABLE_CEF)
+  browser_prefs::RegisterProfilePrefs(registry);
+#endif
 
 #if BUILDFLAG(IS_ANDROID)
   ::android::RegisterUserProfilePrefs(registry);

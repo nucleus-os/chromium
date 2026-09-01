@@ -1139,12 +1139,14 @@ void AppMenu::RunMenu(views::MenuButtonController* host) {
   UMA_HISTOGRAM_ENUMERATION("WrenchMenu.MenuAction", MENU_ACTION_MENU_OPENED,
                             LIMIT_MENU_ACTION);
 
-  menu_runner_->RunMenuAt(
-      host->button()->GetWidget(), host,
-      host->button()->GetAnchorBoundsInScreen(),
-      views::MenuAnchorPosition::kTopRight, ui::mojom::MenuSourceType::kNone,
-      /*native_view_for_gestures=*/gfx::NativeView(), /*corners=*/std::nullopt,
-      "Chrome.AppMenu.MenuHostInitToNextFramePresented");
+  menu_runner_->RunMenuAt(host->button()->GetWidget(), host,
+                          host->button()->GetAnchorBoundsInScreen(),
+                          views::MenuAnchorPosition::kTopRight,
+                          ui::mojom::MenuSourceType::kNone,
+                          /*native_view_for_gestures=*/gfx::NativeView(),
+                          /*parent_widget=*/gfx::kNullAcceleratedWidget,
+                          /*corners=*/std::nullopt,
+                          "Chrome.AppMenu.MenuHostInitToNextFramePresented");
 }
 
 void AppMenu::RunMenu(views::Widget* parent,
@@ -1156,7 +1158,8 @@ void AppMenu::RunMenu(views::Widget* parent,
   menu_runner_->RunMenuAt(
       parent, nullptr, anchor_screen_bounds,
       views::MenuAnchorPosition::kTopRight, ui::mojom::MenuSourceType::kNone,
-      /*native_view_for_gestures=*/gfx::NativeView(), /*corners=*/std::nullopt,
+      /*native_view_for_gestures=*/gfx::NativeView(),
+      /*parent_widget=*/gfx::kNullAcceleratedWidget, /*corners=*/std::nullopt,
       "Chrome.AppMenu.MenuHostInitToNextFramePresented");
 }
 

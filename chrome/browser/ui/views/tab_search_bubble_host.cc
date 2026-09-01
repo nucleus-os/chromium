@@ -63,7 +63,7 @@ TabSearchOpenAction GetActionForEvent(const ui::Event& event) {
 TabSearchBubbleHost::TabSearchBubbleHost(
     views::Button* button,
     BrowserWindowInterface* browser_window_interface)
-    : button_(button),
+    : button_tracker_(button),
       profile_(browser_window_interface->GetProfile()),
       browser_window_interface_(browser_window_interface),
       webui_bubble_manager_(WebUIBubbleManager::Create<TabSearchUI>(
@@ -201,7 +201,7 @@ bool TabSearchBubbleHost::ShowTabSearchBubble(
   const tabs::TabSearchPosition position =
       tabs::GetTabSearchPosition(browser_window_interface_);
   webui_bubble_manager_->ShowBubble(
-      button_,
+      button(),
       (position == tabs::TabSearchPosition::kLeadingHorizontalTabstrip ||
        position == tabs::TabSearchPosition::kVerticalTabstrip)
           ? views::BubbleBorder::TOP_LEFT
@@ -221,9 +221,11 @@ bool TabSearchBubbleHost::ShowTabSearchBubble(
 
   // Hold the pressed lock while the |bubble_| is active.
   // LINT.IfChange(pressed_lock_)
-  pressed_lock_ =
-      static_cast<views::MenuButtonController*>(button_->button_controller())
-          ->TakeLock();
+  if (auto* button = static_cast<views::Button*>(button_tracker_.view())) {
+    pressed_lock_ =
+        static_cast<views::MenuButtonController*>(button->button_controller())
+            ->TakeLock();
+  }
   // LINT.ThenChange(:menu_button_controller)
   return true;
 }

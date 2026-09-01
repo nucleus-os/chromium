@@ -769,6 +769,7 @@ void NativeWidgetMac::Show(ui::mojom::WindowShowState show_state,
       break;
     case ui::mojom::WindowShowState::kMaximized:
     case ui::mojom::WindowShowState::kFullscreen:
+    case ui::mojom::WindowShowState::kHidden:
       NOTIMPLEMENTED();
       break;
     case ui::mojom::WindowShowState::kEnd:

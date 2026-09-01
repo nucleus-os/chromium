@@ -135,6 +135,10 @@ class WEBVIEW_EXPORT WebView : public View,
   void EnableSizingFromWebContents(const gfx::Size& min_size,
                                    const gfx::Size& max_size);
 
+  // Set the background color to use while resizing with a clip. This is white
+  // by default.
+  void SetResizeBackgroundColor(SkColor resize_background_color);
+
   // A scoped object that disconnects the webview from the accessibility tree.
   // When destroyed, it restores the previous accessibility state.
   class WEBVIEW_EXPORT ScopedAxDisconnectLock {

@@ -4152,6 +4152,11 @@ void RenderWidgetHostImpl::StopFling() {
   GetRenderInputRouter()->StopFling();
 }
 
+void RenderWidgetHostImpl::SetCompositorForFlingScheduler(
+    ui::Compositor* compositor) {
+  GetRenderInputRouter()->fling_scheduler()->SetCompositor(compositor);
+}
+
 void RenderWidgetHostImpl::SetScreenOrientationForTesting(
     uint16_t angle,
     display::mojom::ScreenOrientation type) {

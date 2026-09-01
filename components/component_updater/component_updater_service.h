@@ -21,6 +21,7 @@
 #include "build/build_config.h"
 #include "components/update_client/update_client.h"
 
+class CefComponentUpdaterImpl;
 class ComponentsHandler;
 class PluginObserver;
 
@@ -243,6 +244,7 @@ class OnDemandUpdater {
   friend class ash::SmartDimComponentIntegrationTest;
   friend class CrOSComponentInstaller;
 #endif  // BUILDFLAG(IS_CHROMEOS)
+  friend class ::CefComponentUpdaterImpl;
   friend class IwaKeyDistributionComponentInstallerPolicy;
   friend class PlatformRuntimeComponentInstallerPolicy;
   friend void UpdateAIEmbeddingsComponentOnDemand(Priority priority,

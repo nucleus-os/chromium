@@ -536,12 +536,15 @@ class COMPONENT_EXPORT(NATIVE_THEME) NativeTheme {
     caret_blink_interval_ = caret_blink_interval;
   }
 
- protected:
-  explicit NativeTheme(SystemTheme system_theme = SystemTheme::kDefault);
-  virtual ~NativeTheme();
+  // Whether light mode is forced via command-line flag.
+  static bool IsForcedLightMode();
 
   // Whether dark mode is forced via command-line flag.
   static bool IsForcedDarkMode();
+
+ protected:
+  explicit NativeTheme(SystemTheme system_theme = SystemTheme::kDefault);
+  virtual ~NativeTheme();
 
   // Whether high contrast is forced via command-line flag.
   static bool IsForcedHighContrast();

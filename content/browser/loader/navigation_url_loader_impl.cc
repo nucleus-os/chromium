@@ -1304,7 +1304,7 @@ NavigationURLLoaderImpl::CreateNonNetworkLoaderFactory(
   mojo::PendingRemote<network::mojom::URLLoaderFactory>
       terminal_external_protocol;
   bool handled = GetContentClient()->browser()->HandleExternalProtocol(
-      resource_request.url, std::move(web_contents_getter),
+      resource_request.url, web_contents_getter,
       frame_tree_node->frame_tree_node_id(), navigation_ui_data,
       request_info.is_primary_main_frame,
       frame_tree_node->IsInFencedFrameTree(), request_info.sandbox_flags,
@@ -1316,6 +1316,21 @@ NavigationURLLoaderImpl::CreateNonNetworkLoaderFactory(
                 *request_info.initiator_document_token)
           : nullptr,
       request_info.isolation_info, &terminal_external_protocol);
+
+  if (!handled) {
+    handled = GetContentClient()->browser()->HandleExternalProtocol(
+        web_contents_getter, frame_tree_node->frame_tree_node_id(),
+        navigation_ui_data, request_info.is_primary_main_frame,
+        frame_tree_node->IsInFencedFrameTree(), request_info.sandbox_flags,
+        resource_request, initiating_origin,
+        request_info.initiator_document_token
+            ? RenderFrameHostImpl::FromDocumentToken(
+                  request_info.initiator_process_id,
+                  *request_info.initiator_document_token)
+            : nullptr,
+        request_info.isolation_info, &terminal_external_protocol);
+  }
+
   if (terminal_external_protocol) {
     return std::make_pair(
         /*is_cacheable=*/false,

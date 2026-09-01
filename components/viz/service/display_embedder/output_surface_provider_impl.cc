@@ -18,6 +18,7 @@
 #include "build/build_config.h"
 #include "build/chromecast_buildflags.h"
 #include "cc/base/switches.h"
+#include "cef/libcef/browser/osr/software_output_device_proxy.h"
 #include "components/viz/common/display/renderer_settings.h"
 #include "components/viz/common/features.h"
 #include "components/viz/common/frame_sinks/begin_frame_source.h"
@@ -93,7 +94,8 @@ std::unique_ptr<OutputSurface> OutputSurfaceProviderImpl::CreateOutputSurface(
     mojom::DisplayClient* display_client,
     DisplayCompositorMemoryAndTaskController* gpu_dependency,
     const RendererSettings& renderer_settings,
-    const DebugRendererSettings* debug_settings) {
+    const DebugRendererSettings* debug_settings,
+    bool use_proxy_output_device) {
 #if BUILDFLAG(IS_CHROMEOS)
   if (surface_handle == gpu::kNullSurfaceHandle)
     return std::make_unique<OutputSurfaceUnified>();
@@ -101,7 +103,8 @@ std::unique_ptr<OutputSurface> OutputSurfaceProviderImpl::CreateOutputSurface(
 
   if (!gpu_compositing) {
     return std::make_unique<SoftwareOutputSurface>(
-        CreateSoftwareOutputDeviceForPlatform(surface_handle, display_client));
+        CreateSoftwareOutputDeviceForPlatform(surface_handle, display_client,
+                                              use_proxy_output_device));
   } else {
     DCHECK(gpu_dependency);
 
@@ -140,9 +143,19 @@ std::unique_ptr<OutputSurface> OutputSurfaceProviderImpl::CreateOutputSurface(
 std::unique_ptr<SoftwareOutputDevice>
 OutputSurfaceProviderImpl::CreateSoftwareOutputDeviceForPlatform(
     gpu::SurfaceHandle surface_handle,
-    mojom::DisplayClient* display_client) {
+    mojom::DisplayClient* display_client,
+    bool use_proxy_output_device) {
   if (headless_)
     return std::make_unique<SoftwareOutputDevice>();
+
+  if (use_proxy_output_device) {
+    DCHECK(display_client);
+    mojo::PendingRemote<mojom::LayeredWindowUpdater> layered_window_updater;
+    display_client->CreateLayeredWindowUpdater(
+        layered_window_updater.InitWithNewPipeAndPassReceiver());
+    return std::make_unique<SoftwareOutputDeviceProxy>(
+        std::move(layered_window_updater));
+  }
 
 #if BUILDFLAG(IS_WIN)
   HWND child_hwnd;

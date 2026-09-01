@@ -22,6 +22,7 @@ import("//build/config/ui.gni")
 import("//build/gn_logs.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/util/generate_wrapper.gni")
+import("//cef/libcef/features/features.gni")
 import("//chrome/browser/buildflags.gni")
 import("//chrome/enterprise_companion/buildflags.gni")
 import("//components/enterprise/buildflags/buildflags.gni")
@@ -282,6 +283,10 @@ group("gn_all") {
     }
 
     deps += root_extra_deps
+
+    if (enable_cef) {
+      deps += [ "//cef" ]
+    }
 
     if (enable_printing || enable_printing_tests) {
       deps += [ "//printing:printing_unittests" ]

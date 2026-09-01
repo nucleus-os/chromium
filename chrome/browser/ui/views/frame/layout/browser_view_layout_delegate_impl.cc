@@ -117,6 +117,15 @@ views::LayoutAlignment BrowserViewLayoutDelegateImpl::GetWindowTitleAlignment()
   return GetFrameView()->GetWindowTitleAlignment();
 }
 
+void BrowserViewLayoutDelegateImpl::UpdateDialogTopInsetInBrowserView(
+    int* dialog_top_y) const {
+#if BUILDFLAG(ENABLE_CEF)
+  if (auto cef_delegate = browser_view_->browser()->cef_delegate()) {
+    cef_delegate->UpdateDialogTopInset(dialog_top_y);
+  }
+#endif
+}
+
 bool BrowserViewLayoutDelegateImpl::IsToolbarVisible() const {
   return browser_view_->IsToolbarVisible();
 }

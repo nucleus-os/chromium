@@ -270,11 +270,29 @@ std::unique_ptr<permissions::PermissionPrompt> CreateQuietPrompt(
   }
 }
 
+CreatePermissionPromptFunctionPtr g_create_permission_prompt_ptr = nullptr;
+
 }  // namespace
+
+void SetCreatePermissionPromptFunction(CreatePermissionPromptFunctionPtr ptr) {
+  g_create_permission_prompt_ptr = ptr;
+}
 
 std::unique_ptr<permissions::PermissionPrompt> CreatePermissionPrompt(
     content::WebContents* web_contents,
     permissions::PermissionPrompt::Delegate* delegate) {
+  if (g_create_permission_prompt_ptr) {
+    bool default_handling = true;
+    auto prompt = g_create_permission_prompt_ptr(web_contents, delegate,
+                                                 &default_handling);
+    if (prompt) {
+      return prompt;
+    }
+    if (!default_handling) {
+      return nullptr;
+    }
+  }
+
   if (delegate->ShouldDropCurrentRequestIfCannotShowQuietly() &&
       IsFullScreenMode(web_contents)) {
     return nullptr;

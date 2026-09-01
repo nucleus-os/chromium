@@ -3145,10 +3145,10 @@ source_set("browser_tests") {
 
     if (!is_chromeos) {
       # Chrome OS doesn't use background mode or download bubbles.
-      deps += [
-        "//chrome/browser/background/extensions",
-        "//chrome/browser/download/bubble",
-      ]
+      if (enable_background_mode) {
+        deps += [ "//chrome/browser/background/extensions" ]
+      }
+      deps += [ "//chrome/browser/download/bubble" ]
     }
 
     if (use_aura) {

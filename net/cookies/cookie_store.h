@@ -170,6 +170,17 @@ class NET_EXPORT CookieStore {
   // Transfer ownership of a CookieAccessDelegate.
   void SetCookieAccessDelegate(std::unique_ptr<CookieAccessDelegate> delegate);
 
+  // Adds to the list of cookieable schemes. Does nothing if called after first
+  // use of the instance (i.e. after the instance initialization process).
+  virtual void AddCookieableSchemes(const std::vector<std::string>& schemes,
+                                    SetCookieableSchemesCallback callback) = 0;
+
+  // Removes from the list of cookieable schemes. Does nothing if called after
+  // first use of the instance (i.e. after the instance initialization process).
+  virtual void RemoveCookieableSchemes(
+      const std::vector<std::string>& schemes,
+      SetCookieableSchemesCallback callback) = 0;
+
   // This may be null if no delegate has been set yet, or the delegate has been
   // reset to null.
   const CookieAccessDelegate* cookie_access_delegate() const {

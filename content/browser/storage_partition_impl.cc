@@ -3502,9 +3502,12 @@ void StoragePartitionImpl::InitNetworkContext() {
   cert_verifier::mojom::CertVerifierCreationParamsPtr
       cert_verifier_creation_params =
           cert_verifier::mojom::CertVerifierCreationParams::New();
-  GetContentClient()->browser()->ConfigureNetworkContextParams(
+  if (!GetContentClient()->browser()->ConfigureNetworkContextParams(
       browser_context_, is_in_memory(), relative_partition_path_,
-      context_params.get(), cert_verifier_creation_params.get());
+      context_params.get(), cert_verifier_creation_params.get())) {
+    // Don't re-initialize the network context during shutdown.
+    return;
+  }
   // Should be initialized with existing per-profile CORS access lists.
   DCHECK(context_params->cors_origin_access_list.empty())
       << "NetworkContextParams::cors_origin_access_list should be populated "

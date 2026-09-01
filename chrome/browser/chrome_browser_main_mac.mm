@@ -21,6 +21,7 @@
 #include "base/path_service.h"
 #include "base/strings/sys_string_conversions.h"
 #include "build/branding_buildflags.h"
+#include "cef/libcef/features/features.h"
 #import "chrome/browser/app_controller_mac.h"
 #include "chrome/browser/apps/app_shim/app_shim_listener.h"
 #include "chrome/browser/browser_process.h"
@@ -154,6 +155,7 @@ int ChromeBrowserMainPartsMac::PreCreateThreads() {
     return ret;
   }
 
+#if !BUILDFLAG(ENABLE_CEF)
   // Create the app delegate by requesting the shared AppController.
   CHECK_EQ(nil, NSApp.delegate);
   AppController* app_controller = AppController.sharedController;
@@ -164,6 +166,7 @@ int ChromeBrowserMainPartsMac::PreCreateThreads() {
                         /*is_pwa=*/false,
                         /*is_rtl=*/base::i18n::IsRTL());
   [app_controller mainMenuCreated];
+#endif  // BUILDFLAG(ENABLE_CEF)
 
   return content::RESULT_CODE_NORMAL_EXIT;
 }
@@ -182,5 +185,7 @@ void ChromeBrowserMainPartsMac::PostProfileInit(Profile* profile,
 }
 
 void ChromeBrowserMainPartsMac::DidEndMainMessageLoop() {
+#if !BUILDFLAG(ENABLE_CEF)
   [AppController.sharedController didEndMainMessageLoop];
+#endif
 }

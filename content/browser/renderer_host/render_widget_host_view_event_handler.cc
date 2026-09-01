@@ -53,6 +53,10 @@ namespace {
 // of the border area, in percentage of the corresponding dimension.
 const int kMouseLockBorderPercentage = 15;
 
+#if BUILDFLAG(IS_LINUX)
+#include "ui/aura/window_tree_host.h"
+#endif
+
 #if BUILDFLAG(IS_WIN)
 // A callback function for EnumThreadWindows to enumerate and dismiss
 // any owned popup windows.
@@ -859,6 +863,14 @@ void RenderWidgetHostViewEventHandler::MoveCursorToCenter(
     return;
   }
 #endif
+#if BUILDFLAG(IS_LINUX)
+  if (host_view_->HasExternalParent() &&
+      window_ && window_->delegate()->CanFocus()) {
+    aura::WindowTreeHost* host = window_->GetHost();
+    if (host)
+      host->Show();
+  }
+#endif
   synthetic_move_position_ = center_in_screen;
 }
 
@@ -888,6 +900,17 @@ bool RenderWidgetHostViewEventHandler::MatchesSynthesizedMovePosition(
 }
 
 void RenderWidgetHostViewEventHandler::SetKeyboardFocus() {
+#if BUILDFLAG(IS_WIN)
+  if (host_view_->HasExternalParent() &&
+      window_ && window_->delegate()->CanFocus()) {
+    aura::WindowTreeHost* host = window_->GetHost();
+    if (host) {
+      gfx::AcceleratedWidget hwnd = host->GetAcceleratedWidget();
+      if (!(::GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_NOACTIVATE))
+        ::SetFocus(hwnd);
+    }
+  }
+#endif
   // TODO(wjmaclean): can host_ ever be null?
   if (host_ && set_focus_on_mouse_down_or_key_event_) {
     set_focus_on_mouse_down_or_key_event_ = false;

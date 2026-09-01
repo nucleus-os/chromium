@@ -7,6 +7,7 @@
 #include <windows.h>
 
 #include "base/check.h"
+#include "base/command_line.h"
 #include "base/native_library.h"
 #include "base/win/win_util.h"
 #include "base/win/windows_version.h"
@@ -85,11 +86,20 @@ const DarkModeSupport& GetDarkModeSupport() {
   return dark_mode_support;
 }
 
+bool IsForcedLightMode() {
+  static bool kIsForcedLightMode =
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          "force-light-mode");
+  return kIsForcedLightMode;
+}
+
 }  // namespace
 
 namespace base::win {
 
 bool IsDarkModeAvailable() {
+  if (IsForcedLightMode())
+    return false;
   auto& dark_mode_support = GetDarkModeSupport();
   return (dark_mode_support.allow_dark_mode_for_app ||
           dark_mode_support.set_preferred_app_mode) &&

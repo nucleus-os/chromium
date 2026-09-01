@@ -13,11 +13,25 @@
 #include "base/component_export.h"
 #include "base/containers/flat_map.h"
 #include "base/functional/callback.h"
+#include "base/observer_list.h"
 #include "ui/color/color_provider_key.h"
 
 namespace ui {
 
 class ColorProvider;
+
+// Observers which are notified when the color provider manager changes.
+class COMPONENT_EXPORT(COLOR) ColorProviderManagerObserver {
+ public:
+  // Called when the color provider cache is reset.
+  virtual void OnColorProviderCacheReset() {}
+
+  // Called after NativeTheme sends OnNativeThemeUpdated notifications.
+  virtual void OnAfterNativeThemeUpdated() {}
+
+ protected:
+  virtual ~ColorProviderManagerObserver() = default;
+};
 
 // Manages and provides color providers.
 //
@@ -43,6 +57,9 @@ class COMPONENT_EXPORT(COLOR) ColorProviderManager {
   // Clears the ColorProviders stored in `color_providers_`.
   void ResetColorProviderCache();
 
+  // Called after NativeTheme sends OnNativeThemeUpdated notifications.
+  void AfterNativeThemeUpdated();
+
   // Appends `initializer` to the end of the current `initializer_list_`.
   void AppendColorProviderInitializer(
       ColorProviderInitializerList::CallbackType Initializer);
@@ -53,6 +70,10 @@ class COMPONENT_EXPORT(COLOR) ColorProviderManager {
   size_t num_providers_initialized() const {
     return num_providers_initialized_;
   }
+
+  // Add or remove observers.
+  void AddObserver(ColorProviderManagerObserver* observer);
+  void RemoveObserver(ColorProviderManagerObserver* observer);
 
  protected:
   ColorProviderManager();
@@ -71,6 +92,9 @@ class COMPONENT_EXPORT(COLOR) ColorProviderManager {
   // Tracks the number of ColorProviders constructed and initialized by the
   // manager for metrics purposes.
   size_t num_providers_initialized_ = 0;
+
+  base::ObserverList<ColorProviderManagerObserver>::UncheckedAndDanglingUntriaged
+      observers_;
 };
 
 }  // namespace ui

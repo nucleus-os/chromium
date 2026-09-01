@@ -213,6 +213,10 @@ void ChromeWebContentsViewDelegateViewsMac::ShowMenu(
   context_menu_->Show();
 }
 
+bool ChromeWebContentsViewDelegateViewsMac::IsMenuRunning() {
+  return context_menu_ && context_menu_->IsRunning();
+}
+
 content::RenderWidgetHostView*
 ChromeWebContentsViewDelegateViewsMac::GetActiveRenderWidgetHostView() const {
   return web_contents_->GetTopLevelRenderWidgetHostView();

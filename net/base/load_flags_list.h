@@ -123,4 +123,7 @@ LOAD_FLAG(SHOULD_BYPASS_HSTS, 1 << 18)
 // compromised renderer concern is acceptable.
 LOAD_FLAG(IS_MAIN_FRAME_ORIGIN_RECENTLY_ACCESSED, 1 << 19)
 
+// This load will not send any cookies. For CEF usage.
+LOAD_FLAG(DO_NOT_SEND_COOKIES, 1 << 20)
+
 // See note at top of file about why adding LoadFlags is often a bad idea.

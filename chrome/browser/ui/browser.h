@@ -24,6 +24,7 @@
 #include "base/timer/elapsed_timer.h"
 #include "base/types/expected.h"
 #include "build/build_config.h"
+#include "cef/libcef/features/features.h"
 #include "chrome/browser/tab_contents/web_contents_collection.h"
 #include "chrome/browser/ui/bookmarks/bookmark_bar.h"
 #include "chrome/browser/ui/bookmarks/bookmark_bar_controller.h"
@@ -52,6 +53,10 @@
 #include "ui/base/window_open_disposition.h"
 #include "ui/gfx/geometry/rect.h"
 #include "url/origin.h"
+
+#if BUILDFLAG(ENABLE_CEF)
+#include "cef/libcef/browser/chrome/browser_delegate.h"
+#endif
 
 #if BUILDFLAG(IS_ANDROID)
 #error This file should only be included on desktop.
@@ -269,6 +274,15 @@ class Browser : public TabStripModelObserver,
     // Specifies the width for the uncollapsed Vertical Tab Strip.
     std::optional<int> vertical_tab_strip_uncollapsed_width;
 
+#if BUILDFLAG(ENABLE_CEF)
+    // Opaque CEF-specific configuration. Will be propagated to new Browsers.
+    scoped_refptr<cef::BrowserDelegate::CreateParams> cef_params;
+
+    // Specify the Browser that is opening this popup.
+    // Currently only used with TYPE_PICTURE_IN_PICTURE and TYPE_DEVTOOLS.
+    raw_ptr<BrowserWindowInterface, DanglingUntriaged> opener = nullptr;
+#endif
+
    private:
     friend class Browser;
     friend class WindowSizerChromeOSTest;
@@ -327,6 +341,16 @@ class Browser : public TabStripModelObserver,
     update_ui_immediately_for_testing_ = true;
   }
 
+  // Return true if CEF will expose the toolbar to the client. This value is
+  // used to selectively enable toolbar behaviors such as command processing
+  // and omnibox focus without also including the toolbar in BrowserView layout
+  // calculations.
+  void set_toolbar_overridden(bool val) { toolbar_overridden_ = val; }
+  bool toolbar_overridden() const { return toolbar_overridden_; }
+
+  // Used when the BrowserWindow will outlive this Browser.
+  void ReleaseBrowserWindow() { window_.release(); }
+
   // Accessors ////////////////////////////////////////////////////////////////
 
   Type type() const { return type_; }
@@ -348,6 +372,12 @@ class Browser : public TabStripModelObserver,
   BrowserWindowFeatures* browser_window_features() const {
     return features_.get();
   }
+
+#if BUILDFLAG(ENABLE_CEF)
+  cef::BrowserDelegate* cef_delegate() const {
+    return cef_browser_delegate_.get();
+  }
+#endif
 
   base::WeakPtr<Browser> AsWeakPtr();
   base::WeakPtr<const Browser> AsWeakPtr() const;
@@ -527,6 +557,7 @@ class Browser : public TabStripModelObserver,
       DidBecomeInactiveCallback callback) override;
   BrowserActions* GetActions() override;
   Type GetType() const override;
+  bool IsNormalBrowser() const override;
   std::vector<tabs::TabInterface*> GetAllTabInterfaces() override;
   Browser* GetBrowserForMigrationOnly() override;
   const Browser* GetBrowserForMigrationOnly() const override;
@@ -615,6 +646,9 @@ class Browser : public TabStripModelObserver,
                           const ui::Event& event) override;
   void ContentsZoomChange(bool zoom_in) override;
   bool TakeFocus(content::WebContents* source, bool reverse) override;
+  void CanDownload(const GURL& url,
+                   const std::string& request_method,
+                   base::OnceCallback<void(bool)> callback) override;
   bool DidAddMessageToConsole(content::WebContents* source,
                               blink::mojom::ConsoleMessageLevel log_level,
                               const std::u16string& message,
@@ -705,6 +739,10 @@ class Browser : public TabStripModelObserver,
                  const gfx::Rect& selection_rect,
                  int active_match_ordinal,
                  bool final_update) override;
+  void UpdatePreferredSize(content::WebContents* source,
+                           const gfx::Size& pref_size) override;
+  void ResizeDueToAutoResize(content::WebContents* source,
+                             const gfx::Size& new_size) override;
   void RequestPointerLock(content::WebContents* web_contents,
                           bool user_gesture,
                           bool last_unlocked_by_target) override;
@@ -888,6 +926,12 @@ class Browser : public TabStripModelObserver,
 
   // The active state of this browser.
   bool is_active_ = false;
+
+#if BUILDFLAG(ENABLE_CEF)
+  std::unique_ptr<cef::BrowserDelegate> cef_browser_delegate_;
+#endif
+
+  bool toolbar_overridden_ = false;
 
   std::unique_ptr<TabStripModelDelegate> const tab_strip_model_delegate_;
   std::unique_ptr<TabStripModel> const tab_strip_model_;

@@ -48,6 +48,8 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) AssociatedReceiverBase {
   void set_disconnect_handler(base::OnceClosure error_handler);
   void set_disconnect_with_reason_handler(
       ConnectionErrorWithReasonCallback error_handler);
+  void set_disconnect_with_reason_and_result_handler(
+      ConnectionErrorWithReasonAndResultCallback error_handler);
   void reset_on_disconnect();
 
   bool is_bound() const { return !!endpoint_client_; }
@@ -161,6 +163,7 @@ class AssociatedReceiver : public internal::AssociatedReceiverBase {
   // Like above but when invoked |handler| will receive additional metadata
   // about why the remote endpoint was closed, if provided.
   using AssociatedReceiverBase::set_disconnect_with_reason_handler;
+  using AssociatedReceiverBase::set_disconnect_with_reason_and_result_handler;
 
   // Resets this AssociatedReceiver on disconnect. Note that this replaces any
   // previously set disconnection handler. Must be called on a bound

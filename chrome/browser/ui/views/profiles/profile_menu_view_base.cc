@@ -822,8 +822,8 @@ int ProfileMenuViewBase::GetMaxHeight() const {
           ->GetDisplayNearestPoint(anchor_rect.CenterPoint())
           .work_area();
   int available_space = screen_space.bottom() - anchor_rect.bottom();
-#if BUILDFLAG(IS_WIN)
-  // On Windows the bubble can also be show to the top of the anchor.
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
+  // On Windows and macOS the bubble can also be show to the top of the anchor.
   available_space =
       std::max(available_space, anchor_rect.y() - screen_space.y());
 #endif

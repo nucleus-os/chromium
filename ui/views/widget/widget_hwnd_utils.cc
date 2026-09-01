@@ -80,7 +80,8 @@ WindowStyles CalculateWindowStylesFromInitParams(
         styles.style &= static_cast<DWORD>(~(WS_THICKFRAME | WS_MAXIMIZEBOX));
       }
       if (params.remove_standard_frame) {
-        styles.style &= static_cast<DWORD>(~(WS_MINIMIZEBOX | WS_MAXIMIZEBOX));
+        styles.style &= static_cast<DWORD>(~(WS_MINIMIZEBOX | WS_MAXIMIZEBOX |
+                                             WS_CAPTION | WS_SYSMENU));
       }
 
       if (native_widget_delegate->IsDialogBox()) {

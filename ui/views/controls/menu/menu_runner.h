@@ -164,6 +164,8 @@ class VIEWS_EXPORT MenuRunner {
                  MenuAnchorPosition anchor,
                  ui::mojom::MenuSourceType source_type,
                  gfx::NativeView native_view_for_gestures = gfx::NativeView(),
+                 gfx::AcceleratedWidget parent_widget =
+                     gfx::kNullAcceleratedWidget,
                  std::optional<gfx::RoundedCornersF> corners = std::nullopt,
                  std::optional<std::string> show_menu_host_duration_histogram =
                      std::nullopt);

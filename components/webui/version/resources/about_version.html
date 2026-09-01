@@ -49,9 +49,21 @@ about:version template page
         </picture>
 </if>
         <div id="company">$i18n{company}</div>
-        <div id="copyright">$i18n{copyright}</div>
+        <div id="copyright">$i18n{copyright}
+<if expr="enable_cef">
+        <br/><a href="chrome://license">license</a> | <a href="chrome://credits">credits</a>
+</if>
+        </div>
       </div>
       <table id="inner" cellpadding="0" cellspacing="0" border="0">
+<if expr="enable_cef">
+        <tr>
+          <td class="label">CEF</td>
+          <td class="version">
+            <span>$i18n{cef_version}</span>
+          </td>
+        </tr>
+</if>
         <tr><td class="label">$i18n{application_label}</td>
           <td class="version" id="version">
             <span id="copy-content">
@@ -155,7 +167,15 @@ about:version template page
         <tr><td class="label">$i18n{executable_path_name}</td>
           <td class="version" id="executable_path">$i18n{executable_path}</td>
         </tr>
-        <tr><td class="label">$i18n{profile_path_name}</td>
+<if expr="enable_cef">
+        <tr><td class="label">$i18n{module_path_name}</td>
+          <td class="version" id="module_path">$i18n{module_path}</td>
+        </tr>
+        <tr><td class="label">$i18n{user_data_path_name} <sup><a href="#footnote">[*]</a></sup></td>
+          <td class="version" id="user_data_path">$i18n{user_data_path}</td>
+        </tr>
+</if>
+        <tr><td class="label">$i18n{profile_path_name} <sup><a href="#footnote">[*]</a></sup></td>
           <td class="version" id="profile_path">$i18n{profile_path}</td>
         </tr>
 </if>
@@ -198,6 +218,17 @@ about:version template page
           <td class="version" id="sanitizer">$i18n{sanitizer}</td>
         </tr>
       </table>
+<if expr="enable_cef">
+      <div id="footnote">
+        <br/><a name="footnote">[*] In <a href="https://chromium.googlesource.com/chromium/src/+/master/docs/user_data_dir.md" target="_new">Chromium terminology</a>,
+        <a href="https://cef-builds.spotifycdn.com/docs/stable.html?structcef__settings__t.html#a2e2be03f34ddd93de90e1cf196757a19" target="_new">CefSettings.root_cache_path</a>
+        is the "$i18n{user_data_path_name}" and <a href="https://cef-builds.spotifycdn.com/docs/stable.html?structcef__settings__t.html#ad1644a7eb23cad969181db010f007710" target="_new">CefSettings.cache_path</a>
+        is the "$i18n{profile_path_name}". Chromium's <a href="https://chromium.googlesource.com/chromium/src/+/master/chrome/browser/process_singleton.h#35" target="_new">process singleton lock</a>
+        protects against multiple app instances writing to the same "$i18n{user_data_path_name}" directory.
+        Implement <a href="https://cef-builds.spotifycdn.com/docs/stable.html?classCefBrowserProcessHandler.html#a052a91639483467c0b546d57a05c2f06" target="_new">CefBrowserProcessHandler:: OnAlreadyRunningAppRelaunch</a>
+        to handle the case of app relaunch with the same directory.
+      </div>
+</if>
     </div>
 
     <div id="messages" role="alert" aria-live="polite" aria-relevant="additions">

@@ -480,6 +480,12 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
 
   bool ShouldUseDefaultDeadlineOnResize() const;
 
+  using RootWindowBoundsCallback =
+      base::RepeatingCallback<std::optional<gfx::Rect>()>;
+  void SetRootWindowBoundsCallback(const RootWindowBoundsCallback& callback) {
+    root_window_bounds_callback_ = callback;
+  }
+
  protected:
   ~RenderWidgetHostViewAura() override;
 
@@ -905,6 +911,8 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   std::optional<display::ScopedDisplayObserver> display_observer_;
 
   bool use_default_deadline_on_resize_ = false;
+
+  RootWindowBoundsCallback root_window_bounds_callback_;
 
   base::WeakPtrFactory<RenderWidgetHostViewAura> weak_ptr_factory_{this};
 };

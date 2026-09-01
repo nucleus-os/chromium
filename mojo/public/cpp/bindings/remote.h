@@ -159,6 +159,11 @@ class Remote {
     internal_state_.set_connection_error_with_reason_handler(
         std::move(handler));
   }
+  void set_disconnect_with_reason_and_result_handler(
+      ConnectionErrorWithReasonAndResultCallback handler) {
+    internal_state_.set_connection_error_with_reason_and_result_handler(
+        std::move(handler));
+  }
 
   // A convenient helper that resets this Remote on disconnect. Note that this
   // replaces any previously set disconnection handler. Must be called on a

@@ -58,6 +58,7 @@ enum class TabDragKind {
 class BrowserWidget : public views::Widget,
                       public views::ContextMenuController {
  public:
+  BrowserWidget();
   explicit BrowserWidget(BrowserView* browser_view);
 
   BrowserWidget(const BrowserWidget&) = delete;
@@ -98,7 +99,7 @@ class BrowserWidget : public views::Widget,
 
   // ThemeService calls this when a user has changed their theme, indicating
   // that it's time to redraw everything.
-  void UserChangedTheme(BrowserThemeChangeType theme_change_type);
+  virtual void UserChangedTheme(BrowserThemeChangeType theme_change_type);
 
   // views::Widget:
   views::internal::RootView* CreateRootView() override;
@@ -132,21 +133,26 @@ class BrowserWidget : public views::Widget,
   void SetTabDragKind(TabDragKind tab_drag_kind);
   TabDragKind tab_drag_kind() const { return tab_drag_kind_; }
 
+  BrowserView* browser_view() const { return browser_view_.get(); }
+
  protected:
+  void SetBrowserFrameView(BrowserFrameView* browser_frame_view);
+  void SetBrowserView(BrowserView* browser_view);
+
   // views::Widget:
   void OnNativeThemeUpdated(ui::NativeTheme* observed_theme) override;
   ui::ColorProviderKey GetColorProviderKey() const override;
+
+  // Select a native theme that is appropriate for the current context. This is
+  // currently only needed for Linux to switch between the regular NativeTheme
+  // and the GTK NativeTheme instance.
+  void SelectNativeTheme();
 
  private:
   void OnTouchUiChanged();
 
   // Callback for MenuRunner.
   void OnMenuClosed();
-
-  // Select a native theme that is appropriate for the current context. This is
-  // currently only needed for Linux to switch between the regular NativeTheme
-  // and the GTK NativeTheme instance.
-  void SelectNativeTheme();
 
   // Regenerate the frame on theme change if necessary. Returns true if
   // regenerated.

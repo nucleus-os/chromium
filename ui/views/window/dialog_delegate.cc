@@ -107,10 +107,12 @@ DialogDelegate::DialogDelegate() {
 // static
 Widget* DialogDelegate::CreateDialogWidget(WidgetDelegate* delegate,
                                            gfx::NativeWindow context,
-                                           gfx::NativeView parent) {
+                                           gfx::NativeView parent,
+                                           gfx::AcceleratedWidget parent_widget) {
   views::Widget* widget = new DialogWidget;
   views::Widget::InitParams params =
-      GetDialogWidgetInitParams(delegate, context, parent, gfx::Rect());
+      GetDialogWidgetInitParams(delegate, context, parent, gfx::Rect(),
+                                parent_widget);
   widget->Init(std::move(params));
   return widget;
 }
@@ -119,15 +121,17 @@ Widget* DialogDelegate::CreateDialogWidget(WidgetDelegate* delegate,
 Widget* DialogDelegate::CreateDialogWidget(
     std::unique_ptr<WidgetDelegate> delegate,
     gfx::NativeWindow context,
-    gfx::NativeView parent) {
-  return CreateDialogWidget(delegate.release(), context, parent);
+    gfx::NativeView parent,
+    gfx::AcceleratedWidget parent_widget) {
+  return CreateDialogWidget(delegate.release(), context, parent, parent_widget);
 }
 
 // static
-bool DialogDelegate::CanSupportCustomFrame(gfx::NativeView parent) {
+bool DialogDelegate::CanSupportCustomFrame(gfx::NativeView parent,
+                                           gfx::AcceleratedWidget parent_widget) {
 #if BUILDFLAG(IS_LINUX) && BUILDFLAG(ENABLE_DESKTOP_AURA)
   // The new style doesn't support unparented dialogs on Linux desktop.
-  return parent != nullptr;
+  return parent != nullptr || parent_widget != gfx::kNullAcceleratedWidget;
 #else
   return true;
 #endif
@@ -138,7 +142,8 @@ Widget::InitParams DialogDelegate::GetDialogWidgetInitParams(
     WidgetDelegate* delegate,
     gfx::NativeWindow context,
     gfx::NativeView parent,
-    const gfx::Rect& bounds) {
+    const gfx::Rect& bounds,
+    gfx::AcceleratedWidget parent_widget) {
   DialogDelegate* dialog = delegate->AsDialogDelegate();
 
   views::Widget::InitParams params(
@@ -148,7 +153,7 @@ Widget::InitParams DialogDelegate::GetDialogWidgetInitParams(
   params.bounds = bounds;
 
   if (dialog) {
-    dialog->params_.custom_frame &= CanSupportCustomFrame(parent);
+    dialog->params_.custom_frame &= CanSupportCustomFrame(parent, parent_widget);
   }
 
   if (!dialog || dialog->use_custom_frame()) {
@@ -162,6 +167,7 @@ Widget::InitParams DialogDelegate::GetDialogWidgetInitParams(
   }
   params.context = context;
   params.parent = parent;
+  params.parent_widget = parent_widget;
 #if !BUILDFLAG(IS_APPLE)
   // Web-modal (ui::mojom::ModalType::kChild) dialogs with parents are marked as
   // child widgets to prevent top-level window behavior (independent movement,

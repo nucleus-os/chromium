@@ -930,18 +930,20 @@ FindAndEditSubMenuModel::FindAndEditSubMenuModel(
   AddItemWithStringIdAndVectorIcon(
       this, IDC_FIND, IDS_FIND,
       features::IsRoundedIconsEnabled() ? kFindInPageIcon : kSearchMenuOldIcon);
-  AddSeparator(ui::NORMAL_SEPARATOR);
-  AddItemWithStringIdAndVectorIcon(
-      this, IDC_CUT, IDS_CUT,
-      features::IsRoundedIconsEnabled() ? kContentCutIcon : kCutMenuOldIcon);
-  AddItemWithStringIdAndVectorIcon(this, IDC_COPY, IDS_COPY,
-                                   features::IsRoundedIconsEnabled()
-                                       ? vector_icons::kContentCopyIcon
-                                       : kCopyMenuOldIcon);
-  AddItemWithStringIdAndVectorIcon(this, IDC_PASTE, IDS_PASTE,
-                                   features::IsRoundedIconsEnabled()
-                                       ? kContentPasteIcon
-                                       : kPasteMenuOldIcon);
+  if (delegate->IsCommandIdVisible(AppMenuModel::kEditMenuPlaceholder)) {
+    AddSeparator(ui::NORMAL_SEPARATOR);
+    AddItemWithStringIdAndVectorIcon(
+        this, IDC_CUT, IDS_CUT,
+        features::IsRoundedIconsEnabled() ? kContentCutIcon : kCutMenuOldIcon);
+    AddItemWithStringIdAndVectorIcon(this, IDC_COPY, IDS_COPY,
+                                     features::IsRoundedIconsEnabled()
+                                         ? vector_icons::kContentCopyIcon
+                                         : kCopyMenuOldIcon);
+    AddItemWithStringIdAndVectorIcon(this, IDC_PASTE, IDS_PASTE,
+                                     features::IsRoundedIconsEnabled()
+                                         ? kContentPasteIcon
+                                         : kPasteMenuOldIcon);
+  }
 }
 
 class SaveAndShareSubMenuModel : public ui::SimpleMenuModel {
@@ -1082,6 +1084,57 @@ bool ArePromotionsEnabled() {
   PrefService* local_state = g_browser_process->local_state();
   return local_state && local_state->GetBoolean(prefs::kPromotionsEnabled);
 }
+
+#if BUILDFLAG(ENABLE_CEF)
+using IsVisibleCallback = base::RepeatingCallback<bool(int)>;
+
+void FilterMenuModel(ui::SimpleMenuModel* model,
+                     const IsVisibleCallback& is_visible) {
+  std::optional<size_t> last_separator;
+  size_t visible_ct = 0;
+  for (size_t i = 0; i < model->GetItemCount(); ++i) {
+    const auto type = model->GetTypeAt(i);
+    if (type == ui::MenuModel::TYPE_SEPARATOR) {
+      if (last_separator) {
+        // Remove multiple separators in a row. Prefer to remove a NORMAL
+        // separator if possible (as compared to zoom/edit controls which use
+        // UPPER/LOWER separators).
+        if (model->GetSeparatorTypeAt(*last_separator) ==
+            ui::NORMAL_SEPARATOR) {
+          model->RemoveItemAt(*last_separator);
+          i--;
+          last_separator = i;
+        } else {
+          model->RemoveItemAt(i);
+          i--;
+        }
+      } else if (visible_ct == 0) {
+        // Remove leading separator.
+        model->RemoveItemAt(i);
+        i--;
+      } else {
+        last_separator = i;
+      }
+      visible_ct = 0;
+    } else if (is_visible.Run(model->GetCommandIdAt(i))) {
+      last_separator = std::nullopt;
+      visible_ct++;
+
+      if (type == ui::MenuModel::TYPE_SUBMENU) {
+        // Filter sub-menu.
+        auto sub_model =
+            static_cast<ui::SimpleMenuModel*>(model->GetSubmenuModelAt(i));
+        FilterMenuModel(sub_model, is_visible);
+      }
+    }
+  }
+
+  if (last_separator) {
+    // Remove trailing separator.
+    model->RemoveItemAt(*last_separator);
+  }
+}
+#endif  // BUILDFLAG(ENABLE_CEF)
 
 }  // namespace
 
@@ -2118,7 +2171,7 @@ bool AppMenuModel::IsCommandIdChecked(int command_id) const {
   return false;
 }
 
-bool AppMenuModel::IsCommandIdEnabled(int command_id) const {
+bool AppMenuModel::IsCommandIdEnabledInternal(int command_id) const {
   GlobalError* error =
       GlobalErrorServiceFactory::GetForProfile(browser_->GetProfile())
           ->GetGlobalErrorByMenuItemCommandID(command_id);
@@ -2132,6 +2185,30 @@ bool AppMenuModel::IsCommandIdEnabled(int command_id) const {
     default:
       return chrome::IsCommandEnabled(browser_, command_id);
   }
+}
+
+bool AppMenuModel::IsCommandIdEnabled(int command_id) const {
+  if (!IsCommandIdEnabledInternal(command_id)) {
+    return false;
+  }
+
+#if BUILDFLAG(ENABLE_CEF)
+  if (browser_->cef_delegate()) {
+    return browser_->cef_delegate()->IsAppMenuItemEnabled(command_id);
+  }
+#endif
+
+  return true;
+}
+
+bool AppMenuModel::IsCommandIdVisible(int command_id) const {
+#if BUILDFLAG(ENABLE_CEF)
+  if (browser_->cef_delegate()) {
+    return browser_->cef_delegate()->IsAppMenuItemVisible(command_id);
+  }
+#endif
+
+  return true;
 }
 
 bool AppMenuModel::IsCommandIdAlerted(int command_id) const {
@@ -2329,8 +2406,10 @@ void AppMenuModel::Build() {
   SetElementIdentifierAt(GetIndexOfCommandId(IDC_CLEAR_BROWSING_DATA).value(),
                          kClearBrowsingDataMenuItem);
 
-  AddSeparator(ui::NORMAL_SEPARATOR);
-  CreateZoomMenu();
+  if (IsCommandIdVisible(AppMenuModel::kZoomMenuPlaceholder)) {
+    AddSeparator(ui::NORMAL_SEPARATOR);
+    CreateZoomMenu();
+  }
   AddSeparator(ui::NORMAL_SEPARATOR);
 
   AddItemWithStringIdAndVectorIcon(
@@ -2467,6 +2546,11 @@ void AppMenuModel::Build() {
 #endif  // BUILDFLAG(IS_LINUX)
   }
 #endif  // !BUILDFLAG(IS_CHROMEOS)
+
+#if BUILDFLAG(ENABLE_CEF)
+  FilterMenuModel(this, base::BindRepeating(&AppMenuModel::IsCommandIdVisible,
+                                            base::Unretained(this)));
+#endif
 
   uma_action_recorded_ = false;
 }

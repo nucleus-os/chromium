@@ -110,6 +110,9 @@ class CONTENT_EXPORT ContentRendererClient {
   // a crash handler (such as crashpad) is already in use.
   virtual void SetUpWebAssemblyTrapHandler();
 
+  // Notifies that the RenderThread can now send sync IPC messages.
+  virtual void RenderThreadConnected() {}
+
   // Notifies that a new RenderFrame has been created.
   virtual void RenderFrameCreated(RenderFrame* render_frame) {}
 
@@ -351,6 +354,10 @@ class CONTENT_EXPORT ContentRendererClient {
   // Notifies that the window.onload event is about to fire.
   // This method may invalidate the frame.
   virtual void RunScriptsAtDocumentIdle(RenderFrame* render_frame) {}
+
+  // Notifies that a DevTools agent has attached or detached.
+  virtual void DevToolsAgentAttached() {}
+  virtual void DevToolsAgentDetached() {}
 
   // Allows subclasses to enable some runtime features before Blink has
   // started.

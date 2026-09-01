@@ -5,6 +5,7 @@
 #ifndef CHROME_COMMON_CRASH_KEYS_H_
 #define CHROME_COMMON_CRASH_KEYS_H_
 
+#include <string>
 #include <string_view>
 
 namespace base {
@@ -23,6 +24,10 @@ void AllocateCrashKeyInBrowserAndChildren(std::string_view key,
 // AllocateCrashKeyInBrowserAndChildren() which can be consumed by
 // SetCrashKeysFromCommandLine().
 void AppendStringAnnotationsCommandLineSwitch(base::CommandLine* command_line);
+
+// Returns true if the specified command-line flag should be excluded from
+// crash reporting.
+bool IsBoringChromeSwitch(const std::string& flag);
 
 // Sets the kNumSwitches key and the set of keys named using kSwitchFormat based
 // on the given `command_line`. For non-browser processes, allocates crash keys

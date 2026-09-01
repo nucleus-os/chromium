@@ -2560,31 +2560,31 @@ ExtensionFunction::ResponseAction TabsUpdateFunction::Run() {
   }
 
   // tabs_internal::GetTabById may return a null window for prerender tabs.
-  if (!window || !ExtensionTabUtil::BrowserSupportsTabs(
-                     window->GetBrowserWindowInterface())) {
-    return RespondNow(Error(ExtensionTabUtil::kNoCurrentWindowError));
+  TabListInterface* tab_list = nullptr;
+  ::tabs::TabInterface* target_tab = nullptr;
+  if (window && ExtensionTabUtil::BrowserSupportsTabs(
+                    window->GetBrowserWindowInterface())) {
+    tab_list = TabListInterface::From(window->GetBrowserWindowInterface());
+    CHECK(tab_list);
+
+    // Update the active (aka selected) tab.
+    if (!UpdateActiveTab(*params, *window->profile(),
+                         *window->GetBrowserWindowInterface(), *tab_list,
+                         tab_index, error)) {
+      return RespondNow(Error(std::move(error)));
+    }
+
+    // Update the highlighted tab.
+    target_tab = tab_list->GetTab(tab_index);
+    CHECK(target_tab);
+    if (!UpdateHighlightedTab(*params, *window->profile(), *tab_list,
+                              *target_tab, error)) {
+      return RespondNow(Error(std::move(error)));
+    }
   }
 
   // Cache the original web contents.
   content::WebContents* original_contents = contents;
-
-  // Update the active (aka selected) tab.
-  TabListInterface* tab_list =
-      TabListInterface::From(window->GetBrowserWindowInterface());
-  CHECK(tab_list);
-  if (!UpdateActiveTab(*params, *window->profile(),
-                       *window->GetBrowserWindowInterface(), *tab_list,
-                       tab_index, error)) {
-    return RespondNow(Error(std::move(error)));
-  }
-
-  // Update the highlighted tab.
-  ::tabs::TabInterface* target_tab = tab_list->GetTab(tab_index);
-  CHECK(target_tab);
-  if (!UpdateHighlightedTab(*params, *window->profile(), *tab_list, *target_tab,
-                            error)) {
-    return RespondNow(Error(std::move(error)));
-  }
 
   if (params->update_properties.muted &&
       !SetTabAudioMuted(contents, *params->update_properties.muted,
@@ -2625,7 +2625,7 @@ ExtensionFunction::ResponseAction TabsUpdateFunction::Run() {
   }
 #endif
 
-  if (params->update_properties.pinned) {
+  if (target_tab && params->update_properties.pinned) {
     bool pinned = *params->update_properties.pinned;
 
     if (target_tab->IsPinned() != pinned) {
@@ -2655,7 +2655,8 @@ ExtensionFunction::ResponseAction TabsUpdateFunction::Run() {
   // Navigate the tab to a new location if the url is different.
   if (params->update_properties.url) {
     std::string updated_url = *params->update_properties.url;
-    if (window->profile()->IsIncognitoProfile() &&
+    auto* profile = Profile::FromBrowserContext(browser_context());
+    if (profile->IsIncognitoProfile() &&
         !IsURLAllowedInIncognito(GURL(updated_url))) {
       return RespondNow(Error(ErrorUtils::FormatErrorMessage(
           tabs_constants::kURLsNotAllowedInIncognitoError, updated_url)));

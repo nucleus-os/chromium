@@ -5,6 +5,7 @@
 #ifndef BASE_TEST_TRACING_TEST_TRACE_PROCESSOR_EXPORT_H_
 #define BASE_TEST_TRACING_TEST_TRACE_PROCESSOR_EXPORT_H_
 
+#if defined(COMPONENT_BUILD)
 #if defined(WIN32)
 
 #if defined(TEST_TRACE_PROCESSOR_IMPL)
@@ -16,5 +17,9 @@
 #else  // defined(WIN32)
 #define TEST_TRACE_PROCESSOR_EXPORT __attribute__((visibility("default")))
 #endif  // defined(WIN32)
+
+#else  // defined(COMPONENT_BUILD)
+#define TEST_TRACE_PROCESSOR_EXPORT
+#endif
 
 #endif  // BASE_TEST_TRACING_TEST_TRACE_PROCESSOR_EXPORT_H_

@@ -6990,6 +6990,8 @@ WebView* RenderFrameImpl::CreateNewWindow(
         pip_options->disallow_return_to_opener;
     pip_mojom_opts->prefer_initial_window_placement =
         pip_options->prefer_initial_window_placement;
+    pip_mojom_opts->initial_position = pip_options->initial_position;
+    pip_mojom_opts->resizable = pip_options->resizable;
     params->pip_options = std::move(pip_mojom_opts);
   }
 

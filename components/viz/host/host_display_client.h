@@ -46,9 +46,9 @@ class VIZ_HOST_EXPORT HostDisplayClient : public mojom::DisplayClient {
       gfx::CALayerParams ca_layer_params) override;
 #endif
 
-#if BUILDFLAG(IS_WIN)
   void CreateLayeredWindowUpdater(
       mojo::PendingReceiver<mojom::LayeredWindowUpdater> receiver) override;
+#if BUILDFLAG(IS_WIN)
   void AddChildWindowToBrowser(gpu::SurfaceHandle child_window) override;
 #endif
 

@@ -620,6 +620,7 @@ bool BrowserCommandController::ExecuteCommandWithDispositionImpl(
     base::TimeTicks time_stamp,
     std::optional<actions::ActionInvocationContext> context) {
   if (!SupportsCommand(id) || !IsCommandEnabled(id)) {
+    LOG(WARNING) << "Invalid/disabled command " << id;
     return false;
   }
 
@@ -649,6 +650,13 @@ void BrowserCommandController::HandleCommandWithDisposition(
     WindowOpenDisposition disposition,
     base::TimeTicks time_stamp) {
   DCHECK(IsCommandEnabled(id)) << "Invalid/disabled command " << id;
+
+#if BUILDFLAG(ENABLE_CEF)
+  if (browser_->cef_delegate() &&
+      browser_->cef_delegate()->HandleCommand(id, disposition)) {
+    return;
+  }
+#endif
 
   // The order of commands in this switch statement must match the function
   // declaration order in browser.h!
@@ -1684,12 +1692,14 @@ void BrowserCommandController::TabRestoreServiceLoaded(
 
 bool BrowserCommandController::IsShowingMainUI() {
   return browser_->SupportsWindowFeature(
-      Browser::WindowFeature::kFeatureTabStrip);
+             Browser::WindowFeature::kFeatureTabStrip) ||
+         browser_->toolbar_overridden();
 }
 
 bool BrowserCommandController::IsShowingLocationBar() {
   return browser_->SupportsWindowFeature(
-      Browser::WindowFeature::kFeatureLocationBar);
+             Browser::WindowFeature::kFeatureLocationBar) ||
+         browser_->toolbar_overridden();
 }
 
 void BrowserCommandController::InitCommandState() {

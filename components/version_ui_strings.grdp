@@ -78,6 +78,14 @@
   <message name="IDS_VERSION_UI_PROFILE_PATH" desc="label for the profile path on the about:version page">
     Profile Path
   </message>
+  <if expr="enable_cef">
+    <message name="IDS_VERSION_UI_MODULE_PATH" desc="label for the module path on the about:version page">
+      Module Path
+    </message>
+    <message name="IDS_VERSION_UI_USER_DATA_PATH" desc="label for the user data path on the about:version page">
+      User Data Path
+    </message>
+  </if>
   <message name="IDS_VERSION_UI_PATH_NOTFOUND" desc="label for the non-existent path on the about:version page">
     No such file or directory
   </message>

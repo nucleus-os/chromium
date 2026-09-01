@@ -17,11 +17,11 @@ std::string GetApplicationLocale(PrefService* local_state) {
   // LoadLocaleResources(), which is how the global locale is set.
   // TODO(asvitkine): We should try to refactor things so that the logic is not
   // duplicated in multiple files.
-#if !BUILDFLAG(IS_APPLE)
+
   // The pref isn't always registered in unit tests.
   if (local_state->HasPrefPath(prefs::kApplicationLocale))
     preferred_locale = local_state->GetString(prefs::kApplicationLocale);
-#endif
+
   // Note: The call below is necessary even if |preferred_locale| is empty, as
   // it will get the locale that should be used potentially from other sources,
   // depending on the platform (e.g. the OS locale on Mac).

@@ -35,6 +35,7 @@ ui::mojom::WindowShowState ChromeNativeAppWindowViewsAura::GetRestorableState(
 
     case ui::mojom::WindowShowState::kDefault:
     case ui::mojom::WindowShowState::kMinimized:
+    case ui::mojom::WindowShowState::kHidden:
     case ui::mojom::WindowShowState::kInactive:
     case ui::mojom::WindowShowState::kEnd:
       return ui::mojom::WindowShowState::kNormal;

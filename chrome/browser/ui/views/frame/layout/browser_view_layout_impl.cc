@@ -227,7 +227,16 @@ void BrowserViewLayoutImpl::Layout(views::View* host) {
 
   auto params = delegate().GetBrowserLayoutParams(/*use_browser_bounds=*/true);
   if (params.IsEmpty()) {
-    return;
+    // Layout params are empty during early initialization (before the frame
+    // view has been laid out). Fall back to using the host's local bounds
+    // as the visual client area to allow layout to proceed with valid bounds.
+    // This prevents View::Layout's for-loop from triggering child layouts
+    // with 0x0 bounds.
+    params.visual_client_area = host->GetLocalBounds();
+    if (params.IsEmpty()) {
+      // Host also has no bounds yet, can't perform layout.
+      return;
+    }
   }
 
   DoPreLayoutComputations(params);
@@ -359,11 +368,13 @@ void BrowserViewLayoutImpl::OnGlassModeChanged() {}
 int BrowserViewLayoutImpl::GetDialogTop(const ProposedLayout& layout) const {
   const int kConstrainedWindowOverlap = 3;
   const auto* const browser_view = views().browser_view.get();
+  int dialog_top_y = kConstrainedWindowOverlap;
   if (const auto toolbar_rect =
           layout.GetBoundsFor(views().toolbar, browser_view)) {
-    return toolbar_rect->bottom() - kConstrainedWindowOverlap;
+    dialog_top_y = toolbar_rect->bottom() - kConstrainedWindowOverlap;
   }
-  return kConstrainedWindowOverlap;
+  delegate().UpdateDialogTopInsetInBrowserView(&dialog_top_y);
+  return dialog_top_y;
 }
 
 int BrowserViewLayoutImpl::GetDialogBottom(const ProposedLayout& layout) const {

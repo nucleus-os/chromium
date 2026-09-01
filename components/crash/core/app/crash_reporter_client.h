@@ -7,7 +7,9 @@
 
 #include <stdint.h>
 
+#include <map>
 #include <string>
+#include <vector>
 
 #include "build/build_config.h"
 
@@ -190,6 +192,20 @@ class CrashReporterClient {
 
   // Returns true if breakpad should run in the given process type.
   virtual bool EnableBreakpadForProcess(const std::string& process_type);
+
+  // Populate |arguments| with additional optional arguments.
+  virtual void GetCrashOptionalArguments(std::vector<std::string>* arguments);
+
+#if BUILDFLAG(IS_WIN)
+  // Returns the absolute path to the external crash handler exe.
+  virtual std::wstring GetCrashExternalHandler(const std::wstring& exe_dir);
+#endif
+
+#if BUILDFLAG(IS_MAC)
+  // Returns true if forwarding of crashes to the system crash reporter is
+  // enabled for the browser process.
+  virtual bool EnableBrowserCrashForwarding();
+#endif
 };
 
 }  // namespace crash_reporter

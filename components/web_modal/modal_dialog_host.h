@@ -34,6 +34,12 @@ class WEB_MODAL_EXPORT ModalDialogHost {
   // Returns the view against which the dialog is positioned and parented.
   virtual gfx::NativeView GetHostView() const = 0;
 
+  // Returns the widget against which the dialog is positioned and parented.
+  // Used with CEF windowless rendering.
+  virtual gfx::AcceleratedWidget GetAcceleratedWidget() const {
+    return gfx::kNullAcceleratedWidget;
+  }
+
   // Gets the position for the dialog in coordinates relative to the host view.
   virtual gfx::Point GetDialogPosition(const gfx::Size& size) = 0;
 

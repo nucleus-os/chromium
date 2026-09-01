@@ -205,8 +205,7 @@ HorizontalTabStripRegionViewOld::HorizontalTabStripRegionViewOld(
 
   // Add and configure the TabStripComboButton.
   std::unique_ptr<TabStripActionContainer> tab_strip_action_container;
-  if (browser &&
-      (browser->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL)) {
+  if (browser && browser->IsNormalBrowser()) {
     // The Glic button visibility is dynamic and depends on profile state
     // (e.g., sign-in status, enterprise policies, recoverable errors).
     // We instantiate the action container if the profile is eligible (even if

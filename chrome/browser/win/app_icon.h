@@ -14,6 +14,8 @@ class ImageFamily;
 class Size;
 }
 
+void SetExeAppIconResourceId(int icon_id);
+
 HICON GetAppIcon();
 HICON GetSmallAppIcon();
 

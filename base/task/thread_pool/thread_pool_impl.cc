@@ -127,6 +127,10 @@ ThreadPoolImpl::ThreadPoolImpl(
         tracked_ref_factory_.GetTrackedRef(), monitor_worker_thread_priorities,
         record_lock_contention);
   }
+
+  // After https://crrev.com/e2e090c363 the ThreadPool is being created earlier
+  // during initialization. Detach now so we can rebind later on the UI thread.
+  DETACH_FROM_SEQUENCE(sequence_checker_);
 }
 
 ThreadPoolImpl::~ThreadPoolImpl() {

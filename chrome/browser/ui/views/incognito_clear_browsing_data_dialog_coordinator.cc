@@ -22,6 +22,10 @@ IncognitoClearBrowsingDataDialogCoordinator::
 void IncognitoClearBrowsingDataDialogCoordinator::Show(
     IncognitoClearBrowsingDataDialogInterface::Type type,
     views::BubbleAnchor anchor) {
+  // The full toolbar may not be visible.
+  if (anchor.IsNull())
+    return;
+
   if (bubble_tracker_.view() && bubble_tracker_.view()->GetWidget()) {
     // Ensure the previous bubble is closed before creating and showing the new
     // one.

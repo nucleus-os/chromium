@@ -55,11 +55,15 @@ AutofillBubbleBase* ShowSaveBubble(
     content::WebContents* web_contents,
     bool shown_by_user_gesture,
     base::WeakPtr<AddressBubbleControllerDelegate> delegate) {
+  auto browser_window =
+      BrowserWindow::FindBrowserWindowWithWebContents(web_contents);
+  if (!browser_window) {
+    return nullptr;
+  }
   auto controller = std::make_unique<SaveAddressBubbleController>(
       delegate, web_contents, profile, save_address_bubble_type);
 
-  return BrowserWindow::FindBrowserWindowWithWebContents(web_contents)
-      ->GetAutofillBubbleHandler()
+  return browser_window->GetAutofillBubbleHandler()
       ->ShowSaveAddressProfileBubble(web_contents, std::move(controller),
                                      shown_by_user_gesture);
 }
@@ -70,10 +74,14 @@ AutofillBubbleBase* ShowUpdateBubble(
     content::WebContents* web_contents,
     bool shown_by_user_gesture,
     base::WeakPtr<AddressBubbleControllerDelegate> delegate) {
+  auto browser_window =
+      BrowserWindow::FindBrowserWindowWithWebContents(web_contents);
+  if (!browser_window) {
+    return nullptr;
+  }
   auto update_controller = std::make_unique<UpdateAddressBubbleController>(
       delegate, web_contents, profile, original_profile);
-  return BrowserWindow::FindBrowserWindowWithWebContents(web_contents)
-      ->GetAutofillBubbleHandler()
+  return browser_window->GetAutofillBubbleHandler()
       ->ShowUpdateAddressProfileBubble(
           web_contents, std::move(update_controller), shown_by_user_gesture);
 }
@@ -81,11 +89,15 @@ AutofillBubbleBase* ShowUpdateBubble(
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
 AutofillBubbleBase* ShowSignInPromo(content::WebContents* web_contents,
                                     const AutofillProfile& autofill_profile) {
+  auto browser_window =
+      BrowserWindow::FindBrowserWindowWithWebContents(web_contents);
+  if (!browser_window) {
+    return nullptr;
+  }
   // TODO(crbug.com/381390420): Expose the `AutofillBubbleHandler` in
   // `BrowserWindowInterface` and use that instead.
-  return BrowserWindow::FindBrowserWindowWithWebContents(web_contents)
-      ->GetAutofillBubbleHandler()
-      ->ShowAddressSignInPromo(web_contents, autofill_profile);
+  return browser_window->GetAutofillBubbleHandler()->ShowAddressSignInPromo(
+      web_contents, autofill_profile);
 }
 #endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
@@ -243,8 +255,6 @@ void AddressBubblesController::DoShowBubble() {
 
   SetBubbleView(*show_bubble_view_callback_.Run(
       web_contents(), shown_by_user_gesture_, GetWeakPtr()));
-
-  CHECK(bubble_view());
 }
 
 BubbleType AddressBubblesController::GetBubbleType() const {
@@ -311,10 +321,12 @@ void AddressBubblesController::SetUpBubble(
 }
 
 void AddressBubblesController::MaybeShowIOSDektopAddressPromo() {
-  Browser* browser =
-      BrowserWindow::FindBrowserWindowWithWebContents(web_contents())
-          ->AsBrowserView()
-          ->browser();
+  auto browser_window =
+      BrowserWindow::FindBrowserWindowWithWebContents(web_contents());
+  if (!browser_window) {
+    return;
+  }
+  Browser* browser = browser_window->AsBrowserView()->browser();
 
   // Verify if user is eligible for iOS promo, and attempt showing if they are.
   ios_promos_utils::VerifyIOSPromoEligibility(

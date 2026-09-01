@@ -119,6 +119,23 @@ bool CrashReporterClient::ReportingIsEnforcedByPolicy(bool* breakpad_enabled) {
   return false;
 }
 
+void CrashReporterClient::GetCrashOptionalArguments(
+    std::vector<std::string>* arguments) {
+}
+
+#if BUILDFLAG(IS_WIN)
+std::wstring CrashReporterClient::GetCrashExternalHandler(
+    const std::wstring& exe_dir) {
+  return exe_dir + L"\\crashpad_handler.exe";
+}
+#endif
+
+#if BUILDFLAG(IS_MAC)
+bool CrashReporterClient::EnableBrowserCrashForwarding() {
+  return true;
+}
+#endif
+
 #if BUILDFLAG(IS_ANDROID)
 unsigned int CrashReporterClient::GetCrashDumpPercentage() {
   return 100;

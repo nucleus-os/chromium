@@ -18,6 +18,7 @@
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/widget/native_widget_mac.h"
 
+class Browser;
 class BrowserWidget;
 class BrowserView;
 @class BrowserWindowTouchBarController;
@@ -66,6 +67,21 @@ class BrowserNativeWidgetMac : public views::NativeWidgetMac,
   bool ShouldRestorePreviousBrowserWidgetState() const override;
   bool ShouldUseInitialVisibleOnAllWorkspaces() const override;
   void AnnounceTextInInProcessWindow(const std::u16string& text) override;
+
+  static void ValidateUserInterfaceItem(
+      Browser* browser,
+      int32_t command,
+      remote_cocoa::mojom::ValidateUserInterfaceItemResult* result);
+  static bool WillExecuteCommand(
+      Browser* browser,
+      int32_t command,
+      WindowOpenDisposition window_open_disposition,
+      bool is_before_first_responder);
+  static bool ExecuteCommand(
+      Browser* browser,
+      int32_t command,
+      WindowOpenDisposition window_open_disposition,
+      bool is_before_first_responder);
 
  protected:
   ~BrowserNativeWidgetMac() override;

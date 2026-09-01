@@ -683,6 +683,11 @@ void TaskManagerImpl::StopUpdating() {
 
   is_running_ = false;
 
+  // Drop any in-flight async callbacks (e.g. memory-dump replies and GPU
+  // video-memory stats) so they don't fire into a stopped task manager.
+  weak_ptr_factory_.InvalidateWeakPtrs();
+  waiting_for_memory_dump_ = false;
+
   content::GetNetworkService()->EnableDataUseUpdates(false);
 
   for (const auto& provider : task_providers_)

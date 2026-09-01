@@ -394,7 +394,8 @@ bool ResourceRequest::EqualsForTesting(const ResourceRequest& request) const {
 }
 
 bool ResourceRequest::SendsCookies() const {
-  return credentials_mode == network::mojom::CredentialsMode::kInclude;
+  return credentials_mode == network::mojom::CredentialsMode::kInclude &&
+         !(load_flags & net::LOAD_DO_NOT_SEND_COOKIES);
 }
 
 bool ResourceRequest::SavesCookies() const {
@@ -448,7 +449,8 @@ int GetAllowedLoadFlagsForUntrustedRequests() {
          net::LOAD_DISABLE_CACHE | net::LOAD_PREFETCH |
          net::LOAD_IGNORE_LIMITS | net::LOAD_DO_NOT_USE_EMBEDDED_IDENTITY |
          net::LOAD_SUPPORT_ASYNC_REVALIDATION |
-         net::LOAD_RESTRICTED_PREFETCH_FOR_MAIN_FRAME;
+         net::LOAD_RESTRICTED_PREFETCH_FOR_MAIN_FRAME |
+         net::LOAD_DO_NOT_SEND_COOKIES | net::LOAD_DO_NOT_SAVE_COOKIES;
 }
 
 namespace debug {

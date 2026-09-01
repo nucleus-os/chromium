@@ -128,20 +128,28 @@ void BrowserManagerService::DeleteBrowser(Browser* removed_browser) {
   //
   // TODO(crbug.com/40159237): Use ScopedProfileKeepAlive for Incognito too,
   // instead of separate logic for Incognito and regular profiles.
-  target_browser_and_subscriptions->browser.reset();
-  if (browsers_and_subscriptions_.empty() && profile_->IsIncognitoProfile() &&
-      !profile_->IsSystemProfile()) {
+  // Capture state from `this` before destroying the Browser. The destruction
+  // chain may release the last reference keeping the Profile alive (e.g. via
+  // CEF's CefRequestContext release for OTR profiles), which triggers keyed
+  // service shutdown and destroys `this`. Do not access members after the
+  // reset below.
+  const bool is_last_browser = browsers_and_subscriptions_.empty();
+  base::WeakPtr<Profile> weak_profile = profile_->GetWeakPtr();
+  target_browser_and_subscriptions.reset();
+  if (is_last_browser && weak_profile &&
+      weak_profile->IsIncognitoProfile() &&
+      !weak_profile->IsSystemProfile()) {
 #if BUILDFLAG(ENABLE_PRINT_PREVIEW)
     // The Printing Background Manager holds onto preview dialog WebContents
     // whose corresponding print jobs have not yet fully spooled. Make sure
     // these get destroyed before tearing down the incognito profile so that
     // their RenderFrameHosts can exit in time - see crbug.com/41235373
     g_browser_process->background_printing_manager()
-        ->DeletePreviewContentsForBrowserContext(&profile_.get());
+        ->DeletePreviewContentsForBrowserContext(weak_profile.get());
 #endif
     // An incognito profile is no longer needed, this indirectly frees
     // its cache and cookies once it gets destroyed at the appropriate time.
-    ProfileDestroyer::DestroyOTRProfileWhenAppropriate(&profile_.get());
+    ProfileDestroyer::DestroyOTRProfileWhenAppropriate(weak_profile.get());
   }
 
   // If we're exiting, send out the APP_TERMINATING notification to allow other

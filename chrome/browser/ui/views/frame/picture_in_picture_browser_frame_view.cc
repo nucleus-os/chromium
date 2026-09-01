@@ -345,6 +345,11 @@ PictureInPictureBrowserFrameView::PictureInPictureBrowserFrameView(
       IsOverlayViewVisible()) {
     PictureInPictureWindowManager::GetInstance()->ClearCachedBounds();
   }
+
+  if (!browser_view->browser()->SupportsWindowFeature(
+          Browser::WindowFeature::kFeatureTitleBar)) {
+    top_bar_container_view_->SetVisible(false);
+  }
 }
 
 PictureInPictureBrowserFrameView::~PictureInPictureBrowserFrameView() {
@@ -451,18 +456,42 @@ gfx::Rect PictureInPictureBrowserFrameView::GetWindowBoundsForClientBounds(
 
 int PictureInPictureBrowserFrameView::NonClientHitTest(
     const gfx::Point& point) {
-  // Allow interacting with the buttons.
-  if (GetLocationIconViewBounds().Contains(point) ||
-      GetBackToTabControlsBounds().Contains(point) ||
-      GetCloseControlsBounds().Contains(point)) {
-    return HTCLIENT;
-  }
-
-  for (size_t i = 0; i < content_setting_views_.size(); i++) {
-    if (GetContentSettingViewBounds(i).Contains(point)) {
+  const bool frameless = !top_bar_container_view_->GetVisible();
+  if (!frameless) {
+    // Allow interacting with the buttons.
+    if (GetLocationIconViewBounds().Contains(point) ||
+        GetBackToTabControlsBounds().Contains(point) ||
+        GetCloseControlsBounds().Contains(point)) {
       return HTCLIENT;
     }
+
+    for (size_t i = 0; i < content_setting_views_.size(); i++) {
+      if (GetContentSettingViewBounds(i).Contains(point)) {
+        return HTCLIENT;
+      }
+    }
   }
+
+#if BUILDFLAG(ENABLE_CEF)
+  if (frameless) {
+    // Match logic in BrowserView::ShouldDescendIntoChildForEventHandling.
+    const auto draggable_region =
+        GetBrowserView()->browser()->cef_delegate()->GetDraggableRegion();
+    if (draggable_region.has_value()) {
+      // Draggable regions are defined relative to the web contents.
+      gfx::Point point_in_contents_web_view_coords(point);
+      views::View::ConvertPointToTarget(GetWidget()->GetRootView(),
+                                        GetBrowserView()->contents_web_view(),
+                                        &point_in_contents_web_view_coords);
+
+      if (draggable_region->contains(
+              point_in_contents_web_view_coords.x(),
+              point_in_contents_web_view_coords.y())) {
+        return HTCAPTION;
+      }
+    }
+  }
+#endif  // BUILDFLAG(ENABLE_CEF)
 
   // Allow dragging and resizing the window.
   int window_component = GetHTComponentForFrame(
@@ -527,7 +556,8 @@ void PictureInPictureBrowserFrameView::Layout(PassKey) {
   gfx::Rect content_area = GetLocalBounds();
   content_area.Inset(FrameBorderInsets());
   gfx::Rect top_bar = content_area;
-  top_bar.set_height(kTopControlsHeight);
+  top_bar.set_height(
+      top_bar_container_view_->GetVisible() ? kTopControlsHeight : 0);
   top_bar_container_view_->SetBoundsRect(top_bar);
 #if !BUILDFLAG(IS_ANDROID)
   if (auto_pip_setting_overlay_) {
@@ -996,7 +1026,8 @@ gfx::Insets PictureInPictureBrowserFrameView::FrameBorderInsets() const {
 }
 
 int PictureInPictureBrowserFrameView::GetTopAreaHeight() const {
-  return FrameBorderInsets().top() + kTopControlsHeight;
+  return FrameBorderInsets().top() +
+         (top_bar_container_view_->GetVisible() ? kTopControlsHeight : 0);
 }
 
 gfx::Size PictureInPictureBrowserFrameView::GetNonClientViewAreaSize() const {

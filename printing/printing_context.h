@@ -12,6 +12,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/values.h"
 #include "build/build_config.h"
+#include "content/public/common/child_process_id.h"
 #include "printing/buildflags/buildflags.h"
 #include "printing/mojom/print.mojom.h"
 #include "printing/native_drawing_context.h"
@@ -217,6 +218,16 @@ class COMPONENT_EXPORT(PRINTING) PrintingContext {
   void SetJobId(int job_id);
 #endif
 
+  void set_render_ids(content::ChildProcessId render_process_id,
+                      int render_frame_id) {
+    render_process_id_ = render_process_id;
+    render_frame_id_ = render_frame_id;
+  }
+  content::ChildProcessId render_process_id() const {
+    return render_process_id_;
+  }
+  int render_frame_id() const { return render_frame_id_; }
+
  protected:
   PrintingContext(Delegate* delegate,
                   OutOfProcessBehavior out_of_process_behavior);
@@ -252,6 +263,10 @@ class COMPONENT_EXPORT(PRINTING) PrintingContext {
   // or test does not require passing such an ID for extra print job
   // management.
   int job_id_ = kNoPrintJobId;
+
+  // Routing IDs for the frame that owns this object.
+  content::ChildProcessId render_process_id_;
+  int render_frame_id_ = 0;
 
  private:
   const OutOfProcessBehavior out_of_process_behavior_;

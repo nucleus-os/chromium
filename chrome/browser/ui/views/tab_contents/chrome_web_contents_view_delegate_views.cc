@@ -101,6 +101,10 @@ void ChromeWebContentsViewDelegateViews::ShowMenu(
   context_menu_->Show();
 }
 
+bool ChromeWebContentsViewDelegateViews::IsMenuRunning() {
+  return context_menu_ && context_menu_->IsRunning();
+}
+
 void ChromeWebContentsViewDelegateViews::ShowContextMenu(
     content::RenderFrameHost& render_frame_host,
     const content::ContextMenuParams& params) {

@@ -27,7 +27,8 @@ void DesktopTestViewsDelegate::OnBeforeWidgetInit(
     return;
   }
 
-  if (params->parent && params->type != views::Widget::InitParams::TYPE_MENU &&
+  if (params->parent && params->child &&
+      params->type != views::Widget::InitParams::TYPE_MENU &&
       params->type != views::Widget::InitParams::TYPE_TOOLTIP) {
     params->native_widget = new views::NativeWidgetAura(delegate);
   } else {

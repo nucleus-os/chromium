@@ -568,6 +568,8 @@ void RenderThreadImpl::Init() {
       GetContentClient()->renderer()->CreateURLLoaderThrottleProvider(
           blink::URLLoaderThrottleProviderType::kFrame);
 
+  GetContentClient()->renderer()->RenderThreadConnected();
+
   GetAssociatedInterfaceRegistry()->AddInterface<mojom::Renderer>(
       base::BindRepeating(&RenderThreadImpl::OnRendererInterfaceReceiver,
                           base::Unretained(this)));

@@ -98,13 +98,26 @@ bool IsUsingLinuxSystemTheme(Profile* profile) {
 ////////////////////////////////////////////////////////////////////////////////
 // BrowserWidget, public:
 
+BrowserWidget::BrowserWidget() : BrowserWidget(nullptr) {}
+
 BrowserWidget::BrowserWidget(BrowserView* browser_view)
     : browser_native_widget_(nullptr),
       root_view_(nullptr),
       browser_frame_view_(nullptr),
-      browser_view_(browser_view) {
+      browser_view_(nullptr) {
   // Don't focus anything on creation, selecting a tab will set the focus.
   set_focus_on_creation(false);
+  if (browser_view) {
+    SetBrowserView(browser_view);
+  }
+}
+
+void BrowserWidget::SetBrowserFrameView(BrowserFrameView* browser_frame_view) {
+  browser_frame_view_ = browser_frame_view;
+}
+
+void BrowserWidget::SetBrowserView(BrowserView* browser_view) {
+  browser_view_ = browser_view;
 }
 
 BrowserWidget::~BrowserWidget() {
@@ -125,7 +138,11 @@ BrowserWidget::~BrowserWidget() {
   // Do this here and not in ~BrowserView() as BrowserWindowFeatures may attempt
   // to read state on the BrowserWidget as they undergo destruction, and
   // BrowserWidget state is destroyed at the end of this scope.
-  browser_view_->browser()->GetFeatures().TearDownPreBrowserWindowDestruction();
+  if (browser_view_ && browser_view_->browser()) {
+    browser_view_->browser()
+        ->GetFeatures()
+        .TearDownPreBrowserWindowDestruction();
+  }
 }
 
 void BrowserWidget::InitBrowserWidget() {
@@ -235,6 +252,8 @@ void BrowserWidget::GetWindowPlacement(
     ui::mojom::WindowShowState* show_state) const {
   if (browser_native_widget_) {
     browser_native_widget_->GetWindowPlacement(bounds, show_state);
+  } else {
+    *show_state = ui::mojom::WindowShowState::kDefault;
   }
 }
 
@@ -346,6 +365,9 @@ ui::ColorProviderKey::ThemeInitializerSupplier* BrowserWidget::GetCustomTheme()
 }
 
 void BrowserWidget::OnNativeWidgetWorkspaceChanged() {
+  if (!browser_view_) {
+    return;
+  }
   chrome::SaveWindowWorkspace(browser_view_->browser(), GetWorkspace());
   chrome::SaveWindowVisibleOnAllWorkspaces(browser_view_->browser(),
                                            IsVisibleOnAllWorkspaces());
@@ -502,6 +524,13 @@ void BrowserWidget::SelectNativeTheme() {
     return;
   }
 
+  // Always use the NativeTheme for forced color modes.
+  if (ui::NativeTheme::IsForcedDarkMode() ||
+      ui::NativeTheme::IsForcedLightMode()) {
+    SetNativeTheme(native_theme);
+    return;
+  }
+
   // Ignore the system theme for web apps with window-controls-overlay as the
   // display_override so the web contents can blend with the overlay by using
   // the developer-provided theme color for a better experience. Context:
@@ -516,17 +545,23 @@ void BrowserWidget::SelectNativeTheme() {
 }
 
 void BrowserWidget::OnTouchUiChanged() {
-  client_view()->InvalidateLayout();
+  // client_view() is null when there is no NonClientView (e.g. CEF Chrome-style
+  // browsers with a native parent use TYPE_CONTROL). See CEF issue #3941.
+  if (client_view()) {
+    client_view()->InvalidateLayout();
+  }
 
-  // For standard browser frame, if we do not invalidate the FrameView
-  // the client window bounds will not be properly updated which could cause
-  // visual artifacts. See crbug.com/40112464 for details.
-  if (non_client_view()->frame_view()) {
-    // Note that invalidating a view invalidates all of its ancestors, so it is
-    // not necessary to also invalidate the NonClientView or RootView here.
-    non_client_view()->frame_view()->InvalidateLayout();
-  } else {
-    non_client_view()->InvalidateLayout();
+  if (non_client_view()) {
+    // For standard browser frame, if we do not invalidate the FrameView
+    // the client window bounds will not be properly updated which could cause
+    // visual artifacts. See crbug.com/40112464 for details.
+    if (non_client_view()->frame_view()) {
+      // Note that invalidating a view invalidates all of its ancestors, so it
+      // is not necessary to also invalidate the NonClientView or RootView here.
+      non_client_view()->frame_view()->InvalidateLayout();
+    } else {
+      non_client_view()->InvalidateLayout();
+    }
   }
   GetRootView()->InvalidateLayout();
 }
@@ -567,5 +602,8 @@ bool BrowserWidget::RegenerateFrameOnThemeChange(
 }
 
 bool BrowserWidget::IsIncognitoBrowser() const {
+  if (!browser_view_) {
+    return true;
+  }
   return browser_view_->browser()->GetProfile()->IsIncognitoProfile();
 }

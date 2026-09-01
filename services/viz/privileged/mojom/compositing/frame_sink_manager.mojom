@@ -70,6 +70,8 @@ struct RootCompositorFrameSinkParams {
   // `external_begin_frame_controller` is set.
   pending_associated_remote<ExternalBeginFrameControllerClient>?
       external_begin_frame_controller_client;
+
+   bool use_proxy_output_device = false;
 };
 
 // The FrameSinkManager interface is a privileged interface that allows the

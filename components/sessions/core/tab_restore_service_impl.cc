@@ -214,6 +214,7 @@ int SerializeWindowShowState(ui::mojom::WindowShowState show_state) {
     case ui::mojom::WindowShowState::kNormal:
       return kSerializedShowStateNormal;
     case ui::mojom::WindowShowState::kMinimized:
+    case ui::mojom::WindowShowState::kHidden:
       return kSerializedShowStateMinimized;
     case ui::mojom::WindowShowState::kMaximized:
       return kSerializedShowStateMaximized;

@@ -11,6 +11,7 @@
 
 #include "base/memory/raw_ptr.h"
 #include "build/build_config.h"
+#include "cef/libcef/features/features.h"
 #include "content/public/browser/url_data_source.h"
 #include "content/public/browser/web_ui_controller.h"
 #include "content/public/browser/webui_config.h"
@@ -34,6 +35,13 @@ class CreditsUIConfig : public AboutUIConfigBase {
  public:
   CreditsUIConfig();
 };
+
+#if BUILDFLAG(ENABLE_CEF)
+class ChromeUILicenseConfig : public AboutUIConfigBase {
+ public:
+  ChromeUILicenseConfig();
+};
+#endif
 
 #if !BUILDFLAG(IS_ANDROID)
 // chrome://terms

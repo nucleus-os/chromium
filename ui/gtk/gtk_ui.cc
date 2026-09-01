@@ -31,6 +31,7 @@
 #include "base/observer_list.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
+#include "cef/libcef/features/features.h"
 #include "chrome/browser/themes/theme_properties.h"  // nogncheck
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -380,10 +381,15 @@ bool GtkUi::Initialize() {
     connect(settings, "notify::gtk-key-theme-name",
             &GtkUi::OnKeyThemeNameChanged);
   }
+  // Disable GTK theme change notifications because they are extremely slow.
+  // Light/dark theme changes will still be detected via DarkModeManagerLinux.
+  // See https://issues.chromium.org/issues/40280130#comment7
+#if !BUILDFLAG(ENABLE_CEF)
   connect(settings, "notify::gtk-theme-name", &GtkUi::OnThemeChanged);
   connect(settings, "notify::gtk-icon-theme-name", &GtkUi::OnThemeChanged);
   connect(settings, "notify::gtk-application-prefer-dark-theme",
           &GtkUi::OnThemeChanged);
+#endif
   connect(settings, "notify::gtk-cursor-theme-name",
           &GtkUi::OnCursorThemeNameChanged);
   connect(settings, "notify::gtk-cursor-theme-size",

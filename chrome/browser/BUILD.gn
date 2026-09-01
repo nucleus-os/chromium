@@ -11,6 +11,7 @@ import("//build/config/compiler/pgo/pgo.gni")
 import("//build/config/features.gni")
 import("//build/config/python.gni")
 import("//build/config/ui.gni")
+import("//cef/libcef/features/features.gni")
 import("//chrome/browser/buildflags.gni")
 import("//chrome/browser/downgrade/buildflags.gni")
 import("//chrome/common/features.gni")
@@ -2055,6 +2056,7 @@ source_set("browser") {
     "//build/config/compiler:compiler_buildflags",
     "//build/config/linux/dbus:buildflags",
     "//cc",
+    "//cef/libcef/features:buildflags",
     "//chrome:extra_resources",
     "//chrome:resources",
     "//chrome:strings",
@@ -3064,6 +3066,10 @@ source_set("browser") {
       "//ui/webui/resources/cr_components/composebox:mojo_bindings",
       "//ui/webui/resources/cr_components/help_bubble:mojo_bindings",
     ]
+  }
+
+  if (enable_cef) {
+    configs += [ "//cef/libcef/features:config" ]
   }
 
   if (is_android) {

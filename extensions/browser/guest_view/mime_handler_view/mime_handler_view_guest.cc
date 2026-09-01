@@ -171,6 +171,8 @@ void MimeHandlerViewGuest::CreateInnerPage(
     WebContents::CreateParams params(browser_context(),
                                      guest_site_instance.get());
     params.guest_delegate = this;
+    if (delegate_)
+      delegate_->OverrideWebContentsCreateParams(&params);
     std::move(callback).Run(std::move(owned_this),
                             WebContents::CreateWithSessionStorage(
                                 params, owner_web_contents()

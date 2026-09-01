@@ -67,6 +67,7 @@ class COMPONENT_EXPORT(INPUT) RenderInputRouter
 
   InputRouter* input_router() { return input_router_.get(); }
   RenderInputRouterDelegate* delegate() { return delegate_; }
+  input::FlingSchedulerBase* fling_scheduler() { return fling_scheduler_.get(); }
 
   void SetForceEnableZoom(bool);
   void SetDeviceScaleFactor(float device_scale_factor);

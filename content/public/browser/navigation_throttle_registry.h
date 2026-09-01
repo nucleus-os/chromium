@@ -28,7 +28,8 @@ class CONTENT_EXPORT NavigationThrottleRegistry {
   // be called on `navigation_throttle`.
   // AddThrottle() disallows `navigation_throttle` to be nullptr.
   virtual void AddThrottle(
-      std::unique_ptr<NavigationThrottle> navigation_throttle) = 0;
+      std::unique_ptr<NavigationThrottle> navigation_throttle,
+      bool first = false) = 0;
 
   // Checks if the registry contains a throttle with the given name. Returns
   // true if the throttle is found.

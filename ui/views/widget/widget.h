@@ -442,6 +442,8 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
     // setters above.
     gfx::NativeView parent = gfx::NativeView();
 
+    gfx::AcceleratedWidget parent_widget = gfx::kNullAcceleratedWidget;
+
     // Specifies the initial bounds of the Widget. Default is empty, which means
     // the NativeWidget may specify a default size. If the parent is specified
     // and the widget type is not WINDOW_TYPE_POPUP, `bounds` is in the parent's
@@ -958,7 +960,7 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
   void SetVisible(bool visible);
 
   // Activates the widget, assuming it already exists and is visible.
-  void Activate();
+  virtual void Activate();
 
   // Deactivates the widget, making the next window in the Z order the active
   // window.

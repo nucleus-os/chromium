@@ -42,7 +42,8 @@ class OutputSurfaceProvider {
       mojom::DisplayClient* display_client,
       DisplayCompositorMemoryAndTaskController* gpu_dependency,
       const RendererSettings& renderer_settings,
-      const DebugRendererSettings* debug_settings) = 0;
+      const DebugRendererSettings* debug_settings,
+      bool use_proxy_output_device) = 0;
 
   virtual gpu::SharedImageManager* GetSharedImageManager() = 0;
   virtual gpu::SyncPointManager* GetSyncPointManager() = 0;

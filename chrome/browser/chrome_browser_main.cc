@@ -31,6 +31,7 @@
 #include "base/values.h"
 #include "build/branding_buildflags.h"
 #include "build/build_config.h"
+#include "cef/libcef/features/features.h"
 #include "chrome/browser/active_use_util.h"
 #include "chrome/browser/after_startup_task_utils.h"
 #include "chrome/browser/browser_features.h"
@@ -529,7 +530,7 @@ void ProcessSingletonNotificationCallbackImpl(
     return;
   }
 
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) && !BUILDFLAG(ENABLE_CEF)
   // The uninstall command-line switch is handled by the origin process; see
   // ChromeMainDelegate::PostEarlyInitialization(...). The other process won't
   // be able to become the singleton process and will display a window asking
@@ -1150,7 +1151,7 @@ int ChromeBrowserMainParts::OnLocalStateLoaded(
       browser_process_->local_state());
   platform_management_service->RefreshCache(base::NullCallback());
 
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) && !BUILDFLAG(ENABLE_CEF)
   if (first_run::IsChromeFirstRun()) {
     bool stats_default;
     if (GoogleUpdateSettings::GetCollectStatsConsentDefault(&stats_default)) {
@@ -1194,6 +1195,7 @@ int ChromeBrowserMainParts::ApplyFirstRunPrefs() {
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS)
   master_prefs_ = std::make_unique<first_run::MasterPrefs>();
 
+#if !BUILDFLAG(ENABLE_CEF)
   std::unique_ptr<installer::InitialPreferences> installer_initial_prefs =
       startup_data_->chrome_feature_list_creator()->TakeInitialPrefs();
   if (!installer_initial_prefs) {
@@ -1229,6 +1231,7 @@ int ChromeBrowserMainParts::ApplyFirstRunPrefs() {
                             master_prefs_->confirm_to_quit);
   }
 #endif
+#endif  // !BUILDFLAG(ENABLE_CEF)
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS)
   return content::RESULT_CODE_NORMAL_EXIT;
 }
@@ -1298,6 +1301,7 @@ int ChromeBrowserMainParts::PreCreateThreadsImpl() {
 
   browser_process_->browser_policy_connector()->OnResourceBundleCreated();
 
+#if !BUILDFLAG(ENABLE_CEF)
 // Android does first run in Java instead of native.
 // Chrome OS has its own out-of-box-experience code.
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS)
@@ -1308,6 +1312,7 @@ int ChromeBrowserMainParts::PreCreateThreadsImpl() {
     }
   }
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS)
+#endif  // !BUILDFLAG(ENABLE_CEF)
 
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE) &&                                   \
     (BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || \
@@ -1765,6 +1770,7 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   browser_process_->PreMainMessageLoopRun();
 
 #if BUILDFLAG(IS_WIN)
+#if !BUILDFLAG(ENABLE_CEF)
   // If the command line specifies 'uninstall' then we need to work here
   // unless we detect another chrome browser running.
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kUninstall)) {
@@ -1776,6 +1782,7 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
     return ChromeBrowserMainPartsWin::HandleIconsCommands(
         *base::CommandLine::ForCurrentProcess());
   }
+#endif  // !BUILDFLAG(ENABLE_CEF)
 
   ui::SelectFileDialog::SetFactory(
       std::make_unique<ChromeSelectFileDialogFactory>());
@@ -1798,6 +1805,7 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   }
 #endif
 
+#if !BUILDFLAG(ENABLE_CEF)
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kMakeDefaultBrowser)) {
     bool is_managed = g_browser_process->local_state()->IsManagedPreference(
@@ -1811,13 +1819,14 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
                ? static_cast<int>(content::RESULT_CODE_NORMAL_EXIT)
                : static_cast<int>(CHROME_RESULT_CODE_SHELL_INTEGRATION_FAILED);
   }
+#endif  // !BUILDFLAG(ENABLE_CEF)
 
 #if defined(USE_AURA)
   // Make sure aura::Env has been initialized.
   CHECK(aura::Env::GetInstance());
 #endif
 
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) && !BUILDFLAG(ENABLE_CEF)
   // We must call DoUpgradeTasks now that we own the browser singleton to
   // finish upgrade tasks (swap) and relaunch if necessary.
   if (upgrade_util::DoUpgradeTasks(*base::CommandLine::ForCurrentProcess())) {
@@ -1865,7 +1874,7 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   }
 #endif
 
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) && !BUILDFLAG(ENABLE_CEF)
   // Check if there is any machine level Chrome installed on the current
   // machine. If yes and the current Chrome process is user level, we do not
   // allow the user level Chrome to run. So we notify the user and uninstall
@@ -1942,7 +1951,7 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   // Call `PostProfileInit()`and set it up for profiles created later.
   profile_init_manager_ = std::make_unique<ProfileInitManager>(this, profile);
 
-#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS)
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(ENABLE_CEF)
   // Execute first run specific code after the PrefService has been initialized
   // and preferences have been registered since some of the import code depends
   // on preferences.
@@ -1983,7 +1992,7 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   }
 #endif
 
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) && !BUILDFLAG(ENABLE_CEF)
   // Registers Chrome with the Windows Restart Manager, which will restore the
   // Chrome session when the computer is restarted after a system update.
   // This could be run as late as WM_QUERYENDSESSION for system update reboots,
@@ -2093,6 +2102,10 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   }
 #endif
 
+  // Bypass StartupBrowserCreator and RunLoop creation with CEF.
+  // CEF with the Chrome runtime will create and manage its own RunLoop.
+#if !BUILDFLAG(ENABLE_CEF)
+
   // This step is costly.
   if (browser_creator_->Start(*base::CommandLine::ForCurrentProcess(),
                               base::FilePath(), profile_info,
@@ -2120,11 +2133,14 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
 
     // Create the RunLoop for MainMessageLoopRun() to use and transfer
     // ownership of the browser's lifetime to the BrowserProcess.
+    // CEF with the Chrome runtime will create and manage its own RunLoop.
     DCHECK(!GetMainRunLoopInstance());
     GetMainRunLoopInstance() = std::make_unique<base::RunLoop>();
     browser_process_->SetQuitClosure(
         GetMainRunLoopInstance()->QuitWhenIdleClosure());
   }
+#endif  // !BUILDFLAG(ENABLE_CEF)
+
   browser_creator_.reset();
 #endif  // BUILDFLAG(IS_ANDROID)
 

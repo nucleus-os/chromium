@@ -28,12 +28,23 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "url/gurl.h"
 
+#if BUILDFLAG(ENABLE_CEF)
+#include "base/base_paths.h"
+#include "base/path_service.h"
+#include "chrome/common/chrome_paths.h"
+#endif
+
 namespace {
 
 // Retrieves the executable and profile paths on the FILE thread.
 void GetFilePaths(const base::FilePath& profile_path,
                   std::u16string* exec_path_out,
-                  std::u16string* profile_path_out) {
+                  std::u16string* profile_path_out
+#if BUILDFLAG(ENABLE_CEF)
+                  , std::u16string* module_path_out,
+                  std::u16string* user_data_path_out
+#endif
+                  ) {
   base::ScopedBlockingCall scoped_blocking_call(FROM_HERE,
                                                 base::BlockingType::MAY_BLOCK);
 
@@ -51,6 +62,19 @@ void GetFilePaths(const base::FilePath& profile_path,
   } else {
     *profile_path_out = l10n_util::GetStringUTF16(IDS_VERSION_UI_PATH_NOTFOUND);
   }
+
+#if BUILDFLAG(ENABLE_CEF)
+  base::FilePath module_path;
+  if (base::PathService::Get(base::FILE_MODULE, &module_path)) {
+    *module_path_out = module_path.LossyDisplayName();
+  } else {
+    *module_path_out = l10n_util::GetStringUTF16(IDS_VERSION_UI_PATH_NOTFOUND);
+  }
+
+  base::FilePath user_data_dir =
+      base::PathService::CheckedGet(chrome::DIR_USER_DATA);
+  *user_data_path_out = user_data_dir.LossyDisplayName();
+#endif
 }
 
 }  // namespace
@@ -122,23 +146,46 @@ void VersionHandler::HandleRequestPathInfo(const base::ListValue& args) {
   // OnGotFilePaths.
   std::u16string* exec_path_buffer = new std::u16string;
   std::u16string* profile_path_buffer = new std::u16string;
+#if BUILDFLAG(ENABLE_CEF)
+  std::u16string* module_path_buffer = new std::u16string;
+  std::u16string* user_data_path_buffer = new std::u16string;
+#endif
   base::ThreadPool::PostTaskAndReply(
       FROM_HERE, {base::TaskPriority::USER_VISIBLE, base::MayBlock()},
       base::BindOnce(&GetFilePaths, Profile::FromWebUI(web_ui())->GetPath(),
                      base::Unretained(exec_path_buffer),
-                     base::Unretained(profile_path_buffer)),
+                     base::Unretained(profile_path_buffer)
+#if BUILDFLAG(ENABLE_CEF)
+                     , base::Unretained(module_path_buffer),
+                     base::Unretained(user_data_path_buffer)
+#endif
+                     ),
       base::BindOnce(&VersionHandler::OnGotFilePaths,
                      weak_ptr_factory_.GetWeakPtr(), callback_id,
                      base::Owned(exec_path_buffer),
-                     base::Owned(profile_path_buffer)));
+                     base::Owned(profile_path_buffer)
+#if BUILDFLAG(ENABLE_CEF)
+                     , base::Owned(module_path_buffer),
+                     base::Owned(user_data_path_buffer)
+#endif
+                     ));
 }
 
 void VersionHandler::OnGotFilePaths(std::string callback_id,
                                     std::u16string* executable_path_data,
-                                    std::u16string* profile_path_data) {
+                                    std::u16string* profile_path_data
+#if BUILDFLAG(ENABLE_CEF)
+                                    , std::u16string* module_path_data,
+                                    std::u16string* user_data_path_data
+#endif
+                                    ) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   base::DictValue response;
   response.Set(version_ui::kKeyExecPath, *executable_path_data);
   response.Set(version_ui::kKeyProfilePath, *profile_path_data);
+#if BUILDFLAG(ENABLE_CEF)
+  response.Set(version_ui::kKeyModulePath, *module_path_data);
+  response.Set(version_ui::kKeyUserDataPath, *user_data_path_data);
+#endif
   ResolveJavascriptCallback(base::Value(callback_id), response);
 }

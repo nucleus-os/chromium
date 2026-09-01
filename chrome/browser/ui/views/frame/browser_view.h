@@ -152,7 +152,9 @@ class BrowserView : public BrowserWindow,
   // locate this object using just the handle.
   static constexpr char kBrowserViewKey[] = "__BROWSER_VIEW__";
 
+  BrowserView();
   explicit BrowserView(Browser* browser);
+  void InitBrowser(Browser* browser);
   BrowserView(const BrowserView&) = delete;
   BrowserView& operator=(const BrowserView&) = delete;
   ~BrowserView() override;
@@ -816,9 +818,15 @@ class BrowserView : public BrowserWindow,
   bool IsLockedFullscreen() const;
 #endif
 
- protected:
+  // Called during Toolbar destruction to remove dependent objects that have
+  // dangling references.
+  virtual void WillDestroyToolbar();
+
   // BrowserWindow:
   void DeleteBrowserWindow() final;
+
+ protected:
+  virtual ToolbarView* OverrideCreateToolbar() { return nullptr; }
 
  private:
   // Do not friend BrowserViewLayout. Use the BrowserViewLayoutDelegate
@@ -1088,11 +1096,13 @@ class BrowserView : public BrowserWindow,
   class ExclusiveAccessContextImpl;
   std::unique_ptr<ExclusiveAccessContextImpl> exclusive_access_context_;
 
+  gfx::Rect GetFindBarBoundingBoxImpl() const;
+
   // The BrowserWidget that owns this view.
   std::unique_ptr<BrowserWidget> browser_widget_;
 
   // The owning Browser object. `browser_` will outlive this.
-  const raw_ptr<Browser> browser_;
+  raw_ptr<Browser> browser_;
 
   base::CallbackListSubscription chip_visibility_subscription_;
 

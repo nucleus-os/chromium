@@ -85,6 +85,10 @@
 #include "third_party/zlib/google/compression_utils.h"
 #endif
 
+#if BUILDFLAG(ENABLE_CEF)
+#include "cef/grit/cef_resources.h"
+#endif
+
 using content::BrowserThread;
 
 namespace {
@@ -432,6 +436,11 @@ AboutUIConfigBase::AboutUIConfigBase(std::string_view host)
 CreditsUIConfig::CreditsUIConfig()
     : AboutUIConfigBase(chrome::kChromeUICreditsHost) {}
 
+#if BUILDFLAG(ENABLE_CEF)
+ChromeUILicenseConfig::ChromeUILicenseConfig()
+    : AboutUIConfigBase(chrome::kChromeUILicenseHost) {}
+#endif
+
 #if !BUILDFLAG(IS_ANDROID)
 TermsUIConfig::TermsUIConfig()
     : AboutUIConfigBase(chrome::kChromeUITermsHost) {}
@@ -524,6 +533,16 @@ void AboutUIHTMLSource::StartDataRequest(
             IDS_TERMS_HTML);
 #endif
   }
+#if BUILDFLAG(ENABLE_CEF)
+  else if (source_name_ == chrome::kChromeUILicenseHost) {
+    response =
+        "<html><head><title>CEF License</title></head>"
+        "<body bgcolor=\"white\"><pre>" +
+        ui::ResourceBundle::GetSharedInstance().LoadDataResourceString(
+            IDR_CEF_LICENSE_TXT) +
+        "</pre></body></html>";
+  }
+#endif
 
   FinishDataRequest(response, std::move(callback));
 }

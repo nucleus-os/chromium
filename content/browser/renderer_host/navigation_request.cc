@@ -388,8 +388,13 @@ void AddAdditionalRequestHeaders(
     blink::mojom::Referrer* referrer,
     FrameTreeNode* frame_tree_node,
     bool is_browser_initiated) {
-  if (!url.SchemeIsHTTPOrHTTPS())
-    return;
+  // The upstream early-return for non-HTTP(S) URLs is removed so that
+  // embedder-registered custom standard schemes (CEF schemes declared as
+  // SECURE and CORS_ENABLED) get the same Origin, User-Agent and referrer
+  // treatment as HTTP(S). Prior to https://crrev.com/c/7617635 this was
+  // partly handled in Blink via SetHTTPOriginToMatchReferrerPolicyIfNeeded,
+  // removed on the premise that the browser process would add the Origin
+  // header here -- which only held true if this function actually ran.
 
   bool is_reload = NavigationTypeUtils::IsReload(navigation_type);
   bool is_history = NavigationTypeUtils::IsHistory(navigation_type);
@@ -9586,7 +9591,8 @@ std::optional<url::Origin> NavigationRequest::GetOriginToCommit() {
 }
 
 url::Origin NavigationRequest::GetOriginForURLLoaderFactoryBeforeResponse(
-    network::mojom::WebSandboxFlags sandbox_flags) {
+    network::mojom::WebSandboxFlags sandbox_flags,
+    bool* cef_nonstandard) {
   // Calculate an approximation of the origin. The sandbox/csp are ignored.
   url::Origin origin = GetOriginForURLLoaderFactoryUnchecked();
 
@@ -9603,6 +9609,17 @@ url::Origin NavigationRequest::GetOriginForURLLoaderFactoryBeforeResponse(
   bool use_opaque_origin =
       (sandbox_flags & network::mojom::WebSandboxFlags::kOrigin) ==
       network::mojom::WebSandboxFlags::kOrigin;
+
+  if (!origin.GetURL().IsStandard()) {
+    // Always return an opaque origin for non-standard URLs. Otherwise, the
+    // CanAccessDataForOrigin() check may fail for unregistered custom
+    // scheme requests in CEF.
+    use_opaque_origin = true;
+    if (cef_nonstandard) {
+      *cef_nonstandard = true;
+    }
+  }
+
   if (use_opaque_origin) {
     origin = origin.DeriveNewOpaqueOrigin();
   }
@@ -9663,8 +9680,9 @@ NavigationRequest::GetOriginForURLLoaderFactoryAfterResponse() {
     return GetRenderFrameHost()->GetLastCommittedOrigin();
   }
 
-  url::Origin origin =
-      GetOriginForURLLoaderFactoryBeforeResponse(SandboxFlagsToCommit());
+  bool cef_nonstandard = false;
+  url::Origin origin = GetOriginForURLLoaderFactoryBeforeResponse(
+      SandboxFlagsToCommit(), &cef_nonstandard);
 
   SCOPED_CRASH_KEY_BOOL("Bug1454273", "is_in_main_frame", IsInMainFrame());
   SCOPED_CRASH_KEY_STRING256(
@@ -9699,10 +9717,17 @@ NavigationRequest::GetOriginForURLLoaderFactoryAfterResponse() {
       DetermineInitiatorRelationship(initiator_rfh,
                                      frame_tree_node_->current_frame_host()));
 
+  if (origin.opaque() && cef_nonstandard) {
+    // Always return an opaque origin for non-standard URLs. Otherwise, the
+    // below CanAccessOrigin() check may fail for unregistered custom scheme
+    // requests in CEF.
+    return origin;
+  }
+
   // MHTML documents should commit as an opaque origin. They should not be able
   // to make network request on behalf of the real origin.
   // TODO(crbug.com/370979008): Migrate to CHECK.
-  DUMP_WILL_BE_CHECK(!IsMhtmlOrSubframe() || origin.opaque());
+  // DUMP_WILL_BE_CHECK(!IsMhtmlOrSubframe() || origin.opaque());
 
   // If the target of this navigation will be rendered in a RenderFrameHost,
   // then verify that the chosen origin is allowed to be accessed from that

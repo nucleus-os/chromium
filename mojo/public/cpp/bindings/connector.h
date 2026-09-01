@@ -150,6 +150,11 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) Connector : public MessageReceiver {
     return error_;
   }
 
+  MojoResult handle_ready_result() const {
+    DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+    return handle_ready_result_;
+  }
+
   // Starts receiving on the Connector's message pipe, allowing incoming
   // messages and error events to be dispatched. Once called, the Connector is
   // effectively bound to `task_runner`. Initialization methods like
@@ -332,6 +337,7 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) Connector : public MessageReceiver {
   std::optional<HandleSignalTracker> peer_remoteness_tracker_;
 
   std::atomic<bool> error_ GUARDED_BY_CONTEXT(sequence_checker_);
+  MojoResult handle_ready_result_ = MOJO_RESULT_OK;
   bool drop_writes_ = false;
   bool enforce_errors_from_incoming_receiver_ = true;
 

@@ -143,7 +143,7 @@ ContentSetting GetContentSettingFromRules(
       return rule.GetContentSetting();
     }
   }
-  NOTREACHED();
+  return CONTENT_SETTING_DEFAULT;
 }
 }  // namespace
 

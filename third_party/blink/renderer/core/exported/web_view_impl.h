@@ -321,6 +321,20 @@ class CORE_EXPORT WebViewImpl final : public WebView,
       const ColorProviderColorMaps& color_provider_colors) override;
   void SetSupportsDraggableRegions(bool supports_draggable_regions) override;
 
+  void SetMovePictureInPictureEnabled(bool enabled) override {
+    move_pip_enabled_ = enabled;
+  }
+  bool MovePictureInPictureEnabled() const override {
+    return move_pip_enabled_;
+  }
+
+  void SetAllowPictureInPictureWithoutUserActivation(bool allow) override {
+    allow_pip_without_user_activation_ = allow;
+  }
+  bool AllowPictureInPictureWithoutUserActivation() const override {
+    return allow_pip_without_user_activation_;
+  }
+
   void DispatchPersistedPageshow(base::TimeTicks navigation_start);
   void DispatchPagehide(mojom::blink::PagehideDispatch pagehide_dispatch);
   void HookBackForwardCacheEviction(bool hook);
@@ -1015,6 +1029,9 @@ class CORE_EXPORT WebViewImpl final : public WebView,
   // to skip Blink-side scroll restoration to avoid conflicts with the cache's
   // native restoration. Reset on each lifecycle update.
   bool last_page_lifecycle_state_update_restored_from_bfcache_ = false;
+
+  bool move_pip_enabled_ = false;
+  bool allow_pip_without_user_activation_ = false;
 
   // All the registered observers.
   base::ObserverList<WebViewObserver> observers_;

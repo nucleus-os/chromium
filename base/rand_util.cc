@@ -135,17 +135,28 @@ std::vector<uint8_t> RandBytesAsVector(size_t length) {
   return result;
 }
 
-InsecureRandomGenerator::InsecureRandomGenerator() {
-  a_ = base::RandUint64();
-  b_ = base::RandUint64();
-}
+InsecureRandomGenerator::InsecureRandomGenerator() = default;
 
 void InsecureRandomGenerator::ReseedForTesting(uint64_t seed) {
+  // `(0, 0)` is reserved as the "unseeded" sentinel; see header.
+  CHECK_NE(seed, 0u);
   a_ = seed;
   b_ = seed;
 }
 
 uint64_t InsecureRandomGenerator::RandUint64() const {
+  // Lazy seed on first use. Done here rather than in the constructor so that
+  // constructing an `InsecureRandomGenerator` (e.g. as part of a dynamic-init
+  // `thread_local`) is allocator-safe: `base::RandUint64()` can call into
+  // BoringSSL, which may allocate. `(0, 0)` is XorShift128+'s unique fixed
+  // point, so it cannot occur post-seeding and is safe to use as the sentinel.
+  if (a_ == 0 && b_ == 0) [[unlikely]] {
+    do {
+      a_ = base::RandUint64();
+      b_ = base::RandUint64();
+    } while (a_ == 0 && b_ == 0);  // ~2^-128; effectively never iterates.
+  }
+
   // Using XorShift128+, which is simple and widely used. See
   // https://en.wikipedia.org/wiki/Xorshift#xorshift+ for details.
   uint64_t t = a_;

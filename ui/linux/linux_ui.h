@@ -21,6 +21,10 @@
 #include "printing/buildflags/buildflags.h"
 #include "ui/display/types/display_config.h"
 
+#if BUILDFLAG(ENABLE_PRINTING)
+#include "printing/printing_context_linux.h"  // nogncheck
+#endif
+
 // The main entrypoint into Linux toolkit specific code. GTK/QT code should only
 // be executed behind this interface.
 
@@ -61,9 +65,27 @@ class WindowFrameProvider;
 enum class FrameType;
 enum class TextEditCommand;
 
+class COMPONENT_EXPORT(LINUX_UI) PrintingContextLinuxDelegate {
+ public:
+  virtual ~PrintingContextLinuxDelegate() = default;
+
+  virtual std::unique_ptr<printing::PrintDialogLinuxInterface> CreatePrintDialog(
+      printing::PrintingContextLinux* context) = 0;
+
+  virtual gfx::Size GetPdfPaperSize(printing::PrintingContextLinux* context) = 0;
+
+  static PrintingContextLinuxDelegate* SetInstance(
+      PrintingContextLinuxDelegate* delegate);
+  static PrintingContextLinuxDelegate* instance();
+};
+
 // Adapter class with targets to render like different toolkits. Set by any
 // project that wants to do linux desktop native rendering.
-class COMPONENT_EXPORT(LINUX_UI) LinuxUi {
+class COMPONENT_EXPORT(LINUX_UI) LinuxUi
+#if BUILDFLAG(ENABLE_PRINTING)
+    : public PrintingContextLinuxDelegate
+#endif
+ {
  public:
   // 8px is the default value in GTK for how far the mouse needs to move before
   // a drag begins.
@@ -155,14 +177,6 @@ class COMPONENT_EXPORT(LINUX_UI) LinuxUi {
 
   // Returns a map of KeyboardEvent code to KeyboardEvent key values.
   virtual base::flat_map<std::string, std::string> GetKeyboardLayoutMap() = 0;
-
-#if BUILDFLAG(ENABLE_PRINTING)
-  virtual std::unique_ptr<printing::PrintDialogLinuxInterface>
-  CreatePrintDialog(printing::PrintingContextLinux* context) = 0;
-
-  virtual gfx::Size GetPdfPaperSize(
-      printing::PrintingContextLinux* context) = 0;
-#endif
 
   // Returns a native file selection dialog.  `listener` is of type
   // SelectFileDialog::Listener.  TODO(thomasanderson): Move

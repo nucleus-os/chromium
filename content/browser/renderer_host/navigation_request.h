@@ -2541,7 +2541,8 @@ class CONTENT_EXPORT NavigationRequest
   // situations where the final frame host hasn't been determined but the origin
   // is needed to create URLLoaderFactory.
   url::Origin GetOriginForURLLoaderFactoryBeforeResponse(
-      network::mojom::WebSandboxFlags sandbox_flags);
+      network::mojom::WebSandboxFlags sandbox_flags,
+      bool* cef_nonstandard = nullptr);
 
   // Superset of GetOriginForURLLoaderFactoryBeforeResponse(). Calculates
   // the origin with information from the final frame host. Can be called only

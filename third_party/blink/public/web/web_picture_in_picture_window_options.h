@@ -6,6 +6,9 @@
 #define THIRD_PARTY_BLINK_PUBLIC_WEB_WEB_PICTURE_IN_PICTURE_WINDOW_OPTIONS_H_
 
 #include <cstdint>
+#include <optional>
+
+#include "ui/gfx/geometry/point.h"
 
 namespace blink {
 
@@ -14,6 +17,9 @@ struct WebPictureInPictureWindowOptions {
   uint64_t height = 0;
   bool disallow_return_to_opener = false;
   bool prefer_initial_window_placement = false;
+  // CEF extension
+  std::optional<gfx::Point> initial_position;
+  bool resizable = true;
 };
 
 }  // namespace blink

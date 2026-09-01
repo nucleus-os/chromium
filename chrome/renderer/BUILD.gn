@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/buildflags_paint_preview.gni")
+import("//cef/libcef/features/features.gni")
 import("//chrome/common/features.gni")
 import("//chrome/common/request_header_integrity/buildflags.gni")
 import("//components/guest_view/buildflags/buildflags.gni")
@@ -115,6 +116,7 @@ static_library("renderer") {
     ":process_state",
     "//base/allocator:buildflags",
     "//build:chromeos_buildflags",
+    "//cef/libcef/features:buildflags",
     "//chrome:resources",
     "//chrome:strings",
     "//chrome/common",
@@ -237,6 +239,10 @@ static_library("renderer") {
       "bound_session_credentials/bound_session_request_throttled_in_renderer_manager.cc",
       "bound_session_credentials/bound_session_request_throttled_in_renderer_manager.h",
     ]
+  }
+
+  if (enable_cef) {
+    configs += [ "//cef/libcef/features:config" ]
   }
 
   if (enable_plugins) {

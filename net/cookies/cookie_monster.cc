@@ -55,6 +55,7 @@
 #include <set>
 #include <string_view>
 #include <tuple>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -689,6 +690,50 @@ void CookieMonster::SetCookieableSchemes(
   }
 
   cookieable_schemes_ = std::move(schemes);
+  MaybeRunCookieCallback(std::move(callback), true);
+}
+
+void CookieMonster::AddCookieableSchemes(
+    const std::vector<std::string>& schemes,
+    SetCookieableSchemesCallback callback) {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+
+  // Calls to this method will have no effect if made after a WebView or
+  // CookieManager instance has been created.
+  if (initialized_) {
+    MaybeRunCookieCallback(std::move(callback), false);
+    return;
+  }
+
+  for (const auto& element : schemes) {
+    if (std::find(cookieable_schemes_.begin(), cookieable_schemes_.end(),
+                  element) == cookieable_schemes_.end()) {
+      cookieable_schemes_.push_back(element);
+    }
+  }
+  MaybeRunCookieCallback(std::move(callback), true);
+}
+
+void CookieMonster::RemoveCookieableSchemes(
+    const std::vector<std::string>& schemes,
+    SetCookieableSchemesCallback callback) {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+
+  // Calls to this method will have no effect if made after a WebView or
+  // CookieManager instance has been created.
+  if (initialized_) {
+    MaybeRunCookieCallback(std::move(callback), false);
+    return;
+  }
+
+  if (!schemes.empty()) {
+    std::unordered_set<std::string> set(schemes.begin(), schemes.end());
+    auto it = std::remove_if(
+        cookieable_schemes_.begin(),
+        cookieable_schemes_.end(),
+        [&](const auto& s) { return set.count(s); });
+    cookieable_schemes_.erase(it, cookieable_schemes_.end());
+  }
   MaybeRunCookieCallback(std::move(callback), true);
 }
 

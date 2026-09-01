@@ -8,6 +8,7 @@
 #include <memory>
 #include <set>
 #include <string_view>
+#include <tuple>
 #include <utility>
 
 #include "base/auto_reset.h"
@@ -56,6 +57,7 @@
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/device_service.h"
 #include "content/public/browser/render_view_host.h"
+#include "content/public/browser/web_contents.h"
 #include "content/public/common/page_visibility_state.h"
 #include "services/service_manager/public/cpp/interface_provider.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
@@ -859,6 +861,9 @@ gfx::Rect RenderWidgetHostViewAura::GetViewBoundsWithoutTransform() {
 void RenderWidgetHostViewAura::UpdateBackgroundColor() {
   CHECK(GetBackgroundColor());
 
+  if (!window_) {
+    return;
+  }
   SkColor color = *GetBackgroundColor();
   window_->layer()->AsSolidColor()->SetColor(SkColor4f::FromColor(color));
 }
@@ -1242,6 +1247,12 @@ void RenderWidgetHostViewAura::TransformPointToRootSurface(gfx::PointF* point) {
 }
 
 gfx::Rect RenderWidgetHostViewAura::GetBoundsInScreen() {
+  if (!root_window_bounds_callback_.is_null()) {
+    if (auto bounds = root_window_bounds_callback_.Run()) {
+      return *bounds;
+    }
+  }
+
   aura::Window* top_level = window_->GetToplevelWindow();
   gfx::Rect bounds(top_level->GetBoundsInScreen());
 
@@ -2951,6 +2962,16 @@ void RenderWidgetHostViewAura::CreateAuraWindow(aura::client::WindowType type) {
   window_->layer()->AsSolidColor()->SetColor(SkColor4f::FromColor(
       GetBackgroundColor() ? *GetBackgroundColor() : SK_ColorWHITE));
   UpdateFrameSinkIdRegistration();
+
+  // Do this after |window_| is created to avoid crashes on Win10.
+  // See https://crbug.com/761389.
+  auto* web_contents =
+      WebContents::FromRenderViewHost(RenderViewHost::From(host()));
+  if (web_contents) {
+    // TODO(mostynb): actually use prefs.  Landing this as a separate CL
+    // first to rebaseline some unreliable layout tests.
+    std::ignore = web_contents->GetOrCreateWebPreferences();
+  }
 }
 
 void RenderWidgetHostViewAura::UpdateFrameSinkIdRegistration() {

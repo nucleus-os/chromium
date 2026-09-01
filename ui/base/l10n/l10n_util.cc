@@ -293,25 +293,7 @@ std::optional<std::string> CheckAndResolveLocale(std::string_view locale,
   return std::nullopt;
 }
 
-#if BUILDFLAG(IS_APPLE)
-std::string GetApplicationLocaleInternalMac(std::string_view pref_locale) {
-  // Use any override (Cocoa for the browser), otherwise use the preference
-  // passed to the function.
-  std::string app_locale = l10n_util::GetLocaleOverride();
-  if (app_locale.empty())
-    app_locale = pref_locale;
-
-  // The above should handle all of the cases Chrome normally hits, but for some
-  // unit tests, we need something to fall back too.
-  if (app_locale.empty())
-    app_locale = "en-US";
-
-  return app_locale;
-}
-#endif
-
-#if !BUILDFLAG(IS_APPLE)
-std::string GetApplicationLocaleInternalNonMac(std::string_view pref_locale) {
+std::string GetApplicationLocaleInternal(std::string_view pref_locale) {
   std::vector<std::string> candidates;
 
   // We only use --lang and the app pref on Windows.  On Linux, we only
@@ -378,15 +360,6 @@ std::string GetApplicationLocaleInternalNonMac(std::string_view pref_locale) {
   }
 
   return std::string();
-}
-#endif  // !BUILDFLAG(IS_APPLE)
-
-std::string GetApplicationLocaleInternal(std::string_view pref_locale) {
-#if BUILDFLAG(IS_APPLE)
-  return GetApplicationLocaleInternalMac(pref_locale);
-#else
-  return GetApplicationLocaleInternalNonMac(pref_locale);
-#endif
 }
 
 std::string GetApplicationLocale(std::string_view pref_locale,

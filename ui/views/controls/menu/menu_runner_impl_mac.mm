@@ -48,6 +48,7 @@ void MenuRunnerImplMac::RunMenuAt(
     ui::mojom::MenuSourceType source_type,
     int32_t run_types,
     gfx::NativeView native_view_for_gestures,
+    gfx::AcceleratedWidget parent_widget,
     std::optional<gfx::RoundedCornersF> corners,
     std::optional<std::string> show_menu_host_duration_histogram) {
   if (!implementation_) {
@@ -61,7 +62,8 @@ void MenuRunnerImplMac::RunMenuAt(
   }
   implementation_->RunMenuAt(parent, button_controller, bounds, anchor,
                              source_type, run_types, native_view_for_gestures,
-                             corners, show_menu_host_duration_histogram);
+                             parent_widget, corners,
+                             show_menu_host_duration_histogram);
 }
 
 void MenuRunnerImplMac::Cancel() {

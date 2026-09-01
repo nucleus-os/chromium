@@ -134,6 +134,8 @@ class BrowserViewLayout : public views::LayoutManager {
     return views_.side_panel_animation_content;
   }
 
+  void reset_toolbar() { views_.toolbar = nullptr; }
+
   // views::LayoutManager overrides:
   gfx::Size GetPreferredSize(
       const views::View* host,

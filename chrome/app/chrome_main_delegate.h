@@ -18,6 +18,7 @@
 #include "chrome/common/chrome_content_client.h"
 #include "components/memory_system/memory_system.h"
 #include "content/public/app/content_main_delegate.h"
+#include "ui/base/resource/resource_bundle.h"
 
 namespace base {
 class CommandLine;
@@ -50,6 +51,8 @@ class ChromeMainDelegate : public content::ContentMainDelegate {
   ChromeMainDelegate& operator=(const ChromeMainDelegate&) = delete;
 
   ~ChromeMainDelegate() override;
+
+  virtual void CleanupOnUIThread();
 
  protected:
   // content::ContentMainDelegate:
@@ -98,13 +101,17 @@ class ChromeMainDelegate : public content::ContentMainDelegate {
 
   bool IsInitFeatureListEarly() override;
 
+  virtual ui::ResourceBundle::Delegate* GetResourceBundleDelegate() {
+    return nullptr;
+  }
+
   std::unique_ptr<ChromeContentBrowserClient> chrome_content_browser_client_;
   std::unique_ptr<ChromeContentUtilityClient> chrome_content_utility_client_;
   std::unique_ptr<tracing::TracingSamplerProfiler> tracing_sampler_profiler_;
 
   ChromeContentClient chrome_content_client_;
 
-  memory_system::MemorySystem memory_system_;
+  std::unique_ptr<memory_system::MemorySystem> memory_system_;
 
 #if !BUILDFLAG(IS_ANDROID)
   // The sampling profiler exists until the `ChromeContentBrowserClient` is

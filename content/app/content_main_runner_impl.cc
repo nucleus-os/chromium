@@ -51,6 +51,7 @@
 #include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/threading/hang_watcher.h"
 #include "base/threading/platform_thread.h"
+#include "base/threading/thread_restrictions.h"
 #include "base/time/default_clock.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
@@ -980,18 +981,12 @@ int ContentMainRunnerImpl::Initialize(ContentMainParams params) {
       }));
 
 #if !defined(OFFICIAL_BUILD) || BUILDFLAG(CHROME_FOR_TESTING)
-#if BUILDFLAG(IS_WIN)
-  bool should_enable_stack_dump = !process_type.empty();
-#else
-  bool should_enable_stack_dump = true;
-#endif
   // Print stack traces to stderr when crashes occur. This opens up security
   // holes so it should never be enabled for official builds. This needs to
   // happen before crash reporting is initialized (which for chrome happens in
   // the call to PreSandboxStartup() on the delegate below), because otherwise
   // this would interfere with signal handlers used by crash reporting.
-  if (should_enable_stack_dump &&
-      !command_line.HasSwitch(switches::kDisableInProcessStackTraces)) {
+  if (!command_line.HasSwitch(switches::kDisableInProcessStackTraces)) {
     base::debug::EnableInProcessStackDumping();
   }
 
@@ -1377,6 +1372,13 @@ void ContentMainRunnerImpl::Shutdown() {
 
   delegate_ = nullptr;
   is_shutdown_ = true;
+}
+
+void ContentMainRunnerImpl::ShutdownOnUIThread() {
+  base::ScopedAllowBaseSyncPrimitivesForTesting allow_wait;
+  discardable_shared_memory_manager_.reset();
+  browser_memory_coordinator_.reset();
+  memory_pressure_listener_registry_.reset();
 }
 
 // static

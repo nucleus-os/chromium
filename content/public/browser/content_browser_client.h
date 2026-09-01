@@ -1302,6 +1302,12 @@ class CONTENT_EXPORT ContentBrowserClient {
       bool opener_suppressed,
       bool* no_javascript_access);
 
+  // Called to report the result of new window creation after CanCreateWindow()
+  // returns true. There are cases where the new window may still be canceled.
+  virtual void CreateWindowResult(
+      RenderFrameHost* opener,
+      bool success) {}
+
   // Allows the embedder to return a delegate for the SpeechRecognitionManager.
   // The delegate will be owned by the manager. It's valid to return nullptr.
   virtual SpeechRecognitionManagerDelegate*
@@ -2155,7 +2161,7 @@ class CONTENT_EXPORT ContentBrowserClient {
   //
   // If |relative_partition_path| is the empty string, it means this needs to
   // create the default NetworkContext for the BrowserContext.
-  virtual void ConfigureNetworkContextParams(
+  virtual bool ConfigureNetworkContextParams(
       BrowserContext* context,
       bool in_memory,
       const base::FilePath& relative_partition_path,
@@ -2411,6 +2417,22 @@ class CONTENT_EXPORT ContentBrowserClient {
       const net::IsolationInfo& isolation_info,
       mojo::PendingRemote<network::mojom::URLLoaderFactory>* out_factory);
 
+  // Same as above, but exposing the whole ResourceRequest object.
+  virtual bool HandleExternalProtocol(
+      base::RepeatingCallback<WebContents*()> web_contents_getter,
+      FrameTreeNodeId frame_tree_node_id,
+      NavigationUIData* navigation_data,
+      bool is_primary_main_frame,
+      bool is_in_fenced_frame_tree,
+      network::mojom::WebSandboxFlags sandbox_flags,
+      const network::ResourceRequest& request,
+      const std::optional<url::Origin>& initiating_origin,
+      RenderFrameHost* initiator_document,
+      const net::IsolationInfo& isolation_info,
+      mojo::PendingRemote<network::mojom::URLLoaderFactory>* out_factory) {
+    return false;
+  }
+
   // Creates an OverlayWindow to be used for video or Picture-in-Picture.
   // This window will house the content shown when in Picture-in-Picture mode.
   // This will return a new OverlayWindow.
@@ -2484,6 +2506,10 @@ class CONTENT_EXPORT ContentBrowserClient {
   // of the form "productname/version", with no other slashes.
   // Used as part of the user agent string.
   virtual std::string GetProduct();
+
+  // Returns the Chrome-specific product string. This is used for compatibility
+  // purposes with external tools like Selenium.
+  virtual std::string GetChromeProduct() { return GetProduct(); }
 
   // Returns the user agent. Content may cache this value.
   virtual std::string GetUserAgent();

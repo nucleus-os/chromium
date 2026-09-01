@@ -23,6 +23,10 @@
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_observer.h"
 
+#if BUILDFLAG(ENABLE_CEF)
+#include "cef/libcef/browser/chrome/views/chrome_views_util.h"
+#endif
+
 using web_modal::ModalDialogHostObserver;
 using web_modal::WebContentsModalDialogHost;
 
@@ -64,6 +68,8 @@ class BrowserViewLayout::BrowserModalDialogHostViews
   ~BrowserModalDialogHostViews() override {
     observer_list_.Notify(&ModalDialogHostObserver::OnHostDestroying);
   }
+
+  bool HasObservers() const { return !observer_list_.empty(); }
 
   void NotifyPositionRequiresUpdate() override {
     observer_list_.Notify(&ModalDialogHostObserver::OnPositionRequiresUpdate);
@@ -213,18 +219,21 @@ void BrowserViewLayout::UpdateBubbles() {
     exclusive_access_bubble->RepositionIfVisible();
   }
 
-  // Adjust any hosted dialogs if the browser's dialog hosting bounds changed.
-  const gfx::Rect dialog_bounds(dialog_host_->GetDialogPosition(gfx::Size()),
-                                dialog_host_->GetMaximumDialogSize());
-  const gfx::Rect host_widget_bounds =
-      dialog_host_->GetHostWidget()
-          ? dialog_host_->GetHostWidget()->GetClientAreaBoundsInScreen()
-          : gfx::Rect();
-  const gfx::Rect dialog_bounds_in_screen =
-      dialog_bounds + host_widget_bounds.OffsetFromOrigin();
-  if (latest_dialog_bounds_in_screen_ != dialog_bounds_in_screen) {
-    latest_dialog_bounds_in_screen_ = dialog_bounds_in_screen;
-    dialog_host_->NotifyPositionRequiresUpdate();
+  // Avoid unnecessary calls to UpdateDialogTopInsetInBrowserView().
+  if (dialog_host_->HasObservers()) {
+    // Adjust any hosted dialogs if the browser's dialog hosting bounds changed.
+    const gfx::Rect dialog_bounds(dialog_host_->GetDialogPosition(gfx::Size()),
+                                  dialog_host_->GetMaximumDialogSize());
+    const gfx::Rect host_widget_bounds =
+        dialog_host_->GetHostWidget()
+            ? dialog_host_->GetHostWidget()->GetClientAreaBoundsInScreen()
+            : gfx::Rect();
+    const gfx::Rect dialog_bounds_in_screen =
+        dialog_bounds + host_widget_bounds.OffsetFromOrigin();
+    if (latest_dialog_bounds_in_screen_ != dialog_bounds_in_screen) {
+      latest_dialog_bounds_in_screen_ = dialog_bounds_in_screen;
+      dialog_host_->NotifyPositionRequiresUpdate();
+    }
   }
 }
 

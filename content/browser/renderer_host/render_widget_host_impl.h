@@ -895,6 +895,7 @@ class CONTENT_EXPORT RenderWidgetHostImpl
 
   void ProgressFlingIfNeeded(base::TimeTicks current_time);
   void StopFling();
+  void SetCompositorForFlingScheduler(ui::Compositor* compositor);
 
   RenderWidgetHostViewBase* GetRenderWidgetHostViewBase();
 
